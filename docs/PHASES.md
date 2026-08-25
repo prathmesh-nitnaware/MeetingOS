@@ -244,6 +244,51 @@ Do not parallelize everything.
 8. Research
 9. Connectors/hardening
 
-The critical dependency chain is:
-
 Meeting → Transcript → Extraction → Memory → Temporal reasoning → Retrieval → Evidence-backed answer
+
+---
+
+## PHASE 9 — AGENTIC ORGANIZATIONAL REASONING
+
+**Status:** IMPLEMENTED
+
+### Objective
+
+Transform MeetingOS from a unified RAG pipeline into a controlled multi-agent organizational reasoning system that routes queries through specialist agents and enforces strict evidence-based answering (zero hallucination for unestablished facts).
+
+### Architecture
+
+The orchestrator executes the following agent workflow:
+
+```
+Planner Agent → [Retrieval Agent ‖ Graph Agent ‖ Temporal Agent] → Evidence Agent → Answer Agent
+```
+
+| Agent | Responsibility | Wraps |
+|-------|---------------|-------|
+| **PlannerAgent** | Classifies intent, extracts entities/topics, determines routing | `QueryPlanner` |
+| **RetrievalAgent** | Lexical + vector segment retrieval | `HybridSearchEngine` |
+| **TemporalAgent** | Decision/commitment/issue lifecycle events | `TemporalIntelligenceEngine` |
+| **GraphAgent** | Multi-hop entity relationship context | `GraphService` |
+| **EvidenceAgent** | Entity grounding check, faithfulness validation, confidence calibration | — |
+| **AnswerAgent** | Final answer synthesis | `MockReasoner` / injectable `BaseReasoner` |
+
+### Key Guarantee
+
+If any required entity from the plan is **absent** from all retrieved segments, the system:
+- Sets `confidence = 0.0`
+- Sets `insufficient_evidence = True`
+- Returns: *"The available meeting memory does not establish an answer to this question."*
+- Does **not** fabricate an answer
+
+### Deliverables
+
+- `packages/agents/` — Complete multi-agent package (context, base, 6 specialists, orchestrator)
+- `POST /api/v1/query/agentic` — New API endpoint returning `AgentResult` with full trace
+- Agentic Reasoning tab in Search/QA frontend page
+- Extended evaluation with 5 additional system/ablation variants (Systems D, E + ablations)
+- 9 Phase 9 unit tests covering all agents and the API endpoint
+
+### Exit Gate
+
+105 tests passing | Ruff clean | Pyright (new errors: 0) | Docker Compose: valid

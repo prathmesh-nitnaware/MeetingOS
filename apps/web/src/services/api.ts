@@ -240,6 +240,26 @@ export interface QueryResponse {
   reasoning_path: string[];
 }
 
+export interface AgentTraceItem {
+  agent: string;
+  status: string;
+  evidence_count?: number;
+  events_count?: number;
+  relations_count?: number;
+  duration_seconds?: number;
+  error?: string;
+}
+
+export interface AgenticQueryResponse {
+  answer: string;
+  confidence: number;
+  evidence: EvidenceItem[];
+  citations: string[];
+  reasoning_summary: string;
+  trace: AgentTraceItem[];
+  insufficient_evidence: boolean;
+}
+
 export interface TemporalReconciliationResult {
   meeting_id: string;
   decision_changes_detected: number;
@@ -431,6 +451,13 @@ export const api = {
         query_plan_override: planOverride,
         max_evidence_items: maxEvidence,
       }),
+    }),
+
+  queryAgentic: (question: string) =>
+    request<AgenticQueryResponse>("/query/agentic", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question }),
     }),
 
   // Connectors API
