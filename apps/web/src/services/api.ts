@@ -252,7 +252,17 @@ const API_BASE = "/api/v1";
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const url = `${API_BASE}${path}`;
-  const response = await fetch(url, options);
+  const token = localStorage.getItem("meetingos_token");
+  const headers: Record<string, string> = {
+    ...(options?.headers as Record<string, string>),
+  };
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+  const response = await fetch(url, {
+    ...options,
+    headers,
+  });
   if (!response.ok) {
     let errorDetail = "API Request failed";
     try {
@@ -264,6 +274,26 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     throw new Error(errorDetail);
   }
   return response.json() as Promise<T>;
+}
+
+export interface ConnectorStatus {
+  provider: string;
+  enabled: boolean;
+  configured: boolean;
+  authenticated: boolean;
+  last_sync_at: string | null;
+  last_error: string | null;
+}
+
+export interface AuditLog {
+  id: string;
+  timestamp: string;
+  actor_id: string;
+  action: string;
+  resource_type: string;
+  resource_id: string | null;
+  outcome: string;
+  metadata: any | null;
 }
 
 export const api = {
@@ -402,4 +432,41 @@ export const api = {
         max_evidence_items: maxEvidence,
       }),
     }),
+
+  // Connectors API
+  getConnectors: () => request<ConnectorStatus[]>("/connectors"),
+  getConnector: (provider: string) => request<ConnectorStatus>(`/connectors/${provider}`),
+  triggerConnectorSync: (provider: string) =>
+    request<{ status: string; task_id: string }>(`/connectors/${provider}/sync`, {
+      method: "POST",
+    }),
+  listConnectorMeetings: (provider: string) => request<any[]>(`/connectors/${provider}/meetings`),
+
+  // Audit Logs API
+  getAuditLogs: (actorId?: string, action?: string, limit = 50, offset = 0) => {
+    const params = new URLSearchParams({ limit: String(limit), offset: String(offset) });
+    if (actorId) params.append("actor_id", actorId);
+    if (action) params.append("action", action);
+    return request<AuditLog[]>(`/audit?${params.toString()}`);
+  },
+
+  // Admin / Retention Cleanup
+  runRetentionCleanup: (params: {
+    meeting_days?: number;
+    transcript_days?: number;
+    evidence_days?: number;
+    audit_log_days?: number;
+    dry_run?: boolean;
+  }) => {
+    const query = new URLSearchParams();
+    if (params.meeting_days !== undefined) query.append("meeting_days", String(params.meeting_days));
+    if (params.transcript_days !== undefined) query.append("transcript_days", String(params.transcript_days));
+    if (params.evidence_days !== undefined) query.append("evidence_days", String(params.evidence_days));
+    if (params.audit_log_days !== undefined) query.append("audit_log_days", String(params.audit_log_days));
+    if (params.dry_run !== undefined) query.append("dry_run", String(params.dry_run));
+    return request<{ status: string; dry_run: boolean; deleted: Record<string, number> }>(
+      `/admin/retention/cleanup?${query.toString()}`,
+      { method: "POST" }
+    );
+  },
 };

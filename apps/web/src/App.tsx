@@ -7,6 +7,7 @@ import MeetingDetail from "./pages/MeetingDetail"
 import SearchQA from "./pages/SearchQA"
 import EntitiesList from "./pages/EntitiesList"
 import TemporalTimeline from "./pages/TemporalTimeline"
+import Settings from "./pages/Settings"
 
 export const App: React.FC = () => {
   return (
@@ -24,6 +25,7 @@ export const App: React.FC = () => {
             <Route path="/search" element={<SearchQA />} />
             <Route path="/entities" element={<EntitiesList />} />
             <Route path="/temporal" element={<TemporalTimeline />} />
+            <Route path="/settings" element={<Settings />} />
           </Routes>
         </main>
       </div>

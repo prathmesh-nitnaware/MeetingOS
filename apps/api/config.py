@@ -36,5 +36,20 @@ class Settings(BaseSettings):
     classifier_provider: str = "mock"
     reasoner_provider: str = "mock"
 
+    # Connector Configuration
+    teams_enabled: bool = False
+    teams_tenant_id: str | None = None
+    teams_client_id: str | None = None
+    teams_client_secret: str | None = None
+
+    zoom_enabled: bool = False
+    zoom_account_id: str | None = None
+    zoom_client_id: str | None = None
+    zoom_client_secret: str | None = None
+
+    google_meet_enabled: bool = False
+    google_client_id: str | None = None
+    google_client_secret: str | None = None
+
 
 settings = Settings()

@@ -97,6 +97,8 @@ class Meeting(BaseSchema):
     speakers: list[SpeakerInfo] = Field(default_factory=list)
     segments: list[TranscriptSegment] = Field(default_factory=list)
     metadata: MeetingMetadata = Field(default_factory=MeetingMetadata)
+    source_provider: str | None = None
+    external_meeting_id: str | None = None
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
 

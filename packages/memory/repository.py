@@ -1,3 +1,4 @@
+from typing import Any
 from uuid import uuid4
 
 from packages.common.enums import (
@@ -25,6 +26,7 @@ from packages.common.models import (
     TranscriptSegment,
 )
 from packages.memory.models import (
+    AuditLogModel,
     Base,
     CommitmentModel,
     DecisionModel,
@@ -72,6 +74,8 @@ class MeetingRepository:
             processing_status=str(meeting.processing_status),
             model_pipeline_version=meeting.metadata.model_pipeline_version,
             metadata_json=meeting.metadata.model_dump(),
+            source_provider=meeting.source_provider,
+            external_meeting_id=meeting.external_meeting_id,
             created_at=meeting.created_at,
             updated_at=meeting.updated_at,
         )
@@ -140,6 +144,8 @@ class MeetingRepository:
             duration_seconds=meeting_row.duration_seconds,
             source_type=SourceType(meeting_row.source_type),
             processing_status=ProcessingStatus(meeting_row.processing_status),
+            source_provider=meeting_row.source_provider,
+            external_meeting_id=meeting_row.external_meeting_id,
             participants=[
                 Participant(id=p.id, canonical_name=p.canonical_name, aliases=p.aliases or [])
                 for p in meeting_row.participants
@@ -198,6 +204,8 @@ class MeetingRepository:
                     duration_seconds=r.duration_seconds,
                     source_type=SourceType(r.source_type),
                     processing_status=ProcessingStatus(r.processing_status),
+                    source_provider=r.source_provider,
+                    external_meeting_id=r.external_meeting_id,
                     participants=[
                         Participant(
                             id=p.id, canonical_name=p.canonical_name, aliases=p.aliases or []
@@ -721,3 +729,42 @@ class MeetingRepository:
         stmt = select(JobModel).where(JobModel.id == job_id)
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none()
+
+    async def create_audit_log(
+        self,
+        actor_id: str,
+        action: str,
+        resource_type: str,
+        resource_id: str | None,
+        outcome: str,
+        metadata_json: dict[str, Any] | None = None,
+    ) -> AuditLogModel:
+        """Create and persist a security-sensitive operations audit log entry."""
+        log = AuditLogModel(
+            actor_id=actor_id,
+            action=action,
+            resource_type=resource_type,
+            resource_id=resource_id,
+            outcome=outcome,
+            metadata_json=metadata_json,
+        )
+        self.session.add(log)
+        await self.session.flush()
+        return log
+
+    async def get_audit_logs(
+        self,
+        actor_id: str | None = None,
+        action: str | None = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> list[AuditLogModel]:
+        """Fetch audit log entries ordered by timestamp descending."""
+        stmt = select(AuditLogModel)
+        if actor_id:
+            stmt = stmt.where(AuditLogModel.actor_id == actor_id)
+        if action:
+            stmt = stmt.where(AuditLogModel.action == action)
+        stmt = stmt.order_by(AuditLogModel.timestamp.desc()).limit(limit).offset(offset)
+        result = await self.session.execute(stmt)
+        return list(result.scalars().all())

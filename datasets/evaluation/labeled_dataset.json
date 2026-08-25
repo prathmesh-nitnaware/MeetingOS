@@ -1,0 +1,92 @@
+[
+  {
+    "id": "q-01",
+    "question": "Which database was adopted for MeetingOS?",
+    "expected_answer": "PostgreSQL",
+    "category": "factual",
+    "evidence_segments": ["adopt PostgreSQL"],
+    "required_entities": ["PostgreSQL"],
+    "type_filter": "decision"
+  },
+  {
+    "id": "q-02",
+    "question": "Why did we adopt PostgreSQL instead of MongoDB?",
+    "expected_answer": "PostgreSQL with pgvector supports vector embedding lookups",
+    "category": "decision_history",
+    "evidence_segments": ["PostgreSQL with pgvector supports vector embedding lookups"],
+    "required_entities": ["PostgreSQL", "MongoDB"],
+    "type_filter": "decision"
+  },
+  {
+    "id": "q-03",
+    "question": "What task did Rahul Verma commit to finish by Friday?",
+    "expected_answer": "database schema migration",
+    "category": "commitment_history",
+    "evidence_segments": ["database schema migration by Friday"],
+    "required_entities": ["Rahul Verma", "Friday"],
+    "type_filter": "action"
+  },
+  {
+    "id": "q-04",
+    "question": "Who is the owner of the database migration task?",
+    "expected_answer": "Priya Sharma",
+    "category": "commitment_history",
+    "evidence_segments": ["Priya Sharma"],
+    "required_entities": ["Priya Sharma"],
+    "type_filter": "action"
+  },
+  {
+    "id": "q-05",
+    "question": "What issue did Alex Rivera report regarding Redis?",
+    "expected_answer": "timeout issue in Redis cache",
+    "category": "issue_history",
+    "evidence_segments": ["timeout issue in Redis cache"],
+    "required_entities": ["Alex Rivera", "Redis"],
+    "type_filter": "issue"
+  },
+  {
+    "id": "q-06",
+    "question": "Is the Redis timeout issue resolved now?",
+    "expected_answer": "resolved",
+    "category": "issue_history",
+    "evidence_segments": ["resolved"],
+    "required_entities": ["Redis"],
+    "type_filter": "issue"
+  },
+  {
+    "id": "q-07",
+    "question": "When is the database migration due according to latest commitments?",
+    "expected_answer": "Friday",
+    "category": "temporal",
+    "evidence_segments": ["Friday"],
+    "required_entities": ["Friday"],
+    "type_filter": "action"
+  },
+  {
+    "id": "q-08",
+    "question": "What did the team decide about upgrading the Docker Compose config to Kubernetes?",
+    "expected_answer": "does not establish an answer",
+    "category": "insufficient_evidence",
+    "evidence_segments": [],
+    "required_entities": ["Docker Compose", "Kubernetes"],
+    "type_filter": "decision"
+  },
+  {
+    "id": "q-09",
+    "question": "Who is working on the frontend portal?",
+    "expected_answer": "does not establish an answer",
+    "category": "insufficient_evidence",
+    "evidence_segments": [],
+    "required_entities": [],
+    "type_filter": "action"
+  },
+  {
+    "id": "q-10",
+    "question": "What was decided regarding the production deployment server?",
+    "expected_answer": "does not establish an answer",
+    "category": "insufficient_evidence",
+    "evidence_segments": [],
+    "required_entities": [],
+    "type_filter": "decision"
+  }
+]

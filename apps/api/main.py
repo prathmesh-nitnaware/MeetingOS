@@ -3,6 +3,9 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 from apps.api.config import settings
+from apps.api.routers.admin import router as admin_router
+from apps.api.routers.audit import router as audit_router
+from apps.api.routers.connectors import router as connectors_router
 from apps.api.routers.dashboard import router as dashboard_router
 from apps.api.routers.entities import router as entities_router
 from apps.api.routers.graph import router as graph_router
@@ -69,6 +72,9 @@ def create_app() -> FastAPI:
     app.include_router(entities_router, prefix=settings.api_v1_prefix)
     app.include_router(temporal_router, prefix=settings.api_v1_prefix)
     app.include_router(query_router, prefix=settings.api_v1_prefix)
+    app.include_router(connectors_router, prefix=settings.api_v1_prefix)
+    app.include_router(audit_router, prefix=settings.api_v1_prefix)
+    app.include_router(admin_router, prefix=settings.api_v1_prefix)
 
     @app.get("/")
     async def root_redirect() -> dict[str, str]:

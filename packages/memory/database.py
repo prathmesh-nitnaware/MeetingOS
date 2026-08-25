@@ -1,6 +1,7 @@
 import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from typing import Any
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import (
@@ -19,14 +20,20 @@ _session_maker: async_sessionmaker[AsyncSession] | None = None
 def get_engine(database_url: str) -> AsyncEngine:
     """Get or create singleton async SQLAlchemy engine."""
     global _engine, _session_maker
+    if _engine is not None and str(_engine.url) != database_url:
+        _engine = None
+        _session_maker = None
+
     if _engine is None:
-        _engine = create_async_engine(
-            database_url,
-            echo=False,
-            pool_pre_ping=True,
-            pool_size=5,
-            max_overflow=10,
-        )
+        engine_kwargs: dict[str, Any] = {
+            "echo": False,
+            "pool_pre_ping": True,
+        }
+        if "sqlite" not in database_url:
+            engine_kwargs["pool_size"] = 5
+            engine_kwargs["max_overflow"] = 10
+
+        _engine = create_async_engine(database_url, **engine_kwargs)
         _session_maker = async_sessionmaker(
             bind=_engine,
             class_=AsyncSession,

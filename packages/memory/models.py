@@ -47,6 +47,8 @@ class MeetingModel(Base):
     )
     model_pipeline_version: Mapped[str] = mapped_column(String(50), nullable=False, default="1.0.0")
     metadata_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    source_provider: Mapped[str | None] = mapped_column(String(100), nullable=True, index=True)
+    external_meeting_id: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, nullable=False
     )
@@ -98,7 +100,10 @@ class MeetingModel(Base):
         "EvidenceModel", back_populates="meeting", cascade="all, delete-orphan"
     )
 
-    __table_args__ = (Index("ix_meetings_status_date", "processing_status", "meeting_date"),)
+    __table_args__ = (
+        Index("ix_meetings_status_date", "processing_status", "meeting_date"),
+        Index("ix_meetings_external_id", "source_provider", "external_meeting_id", unique=True),
+    )
 
 
 class ParticipantModel(Base):
@@ -248,6 +253,9 @@ class DecisionModel(Base):
     status: Mapped[str] = mapped_column(String(50), nullable=False, default="Approved", index=True)
     rationale: Mapped[str | None] = mapped_column(Text, nullable=True)
     evidence_segment_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    model_name: Mapped[str] = mapped_column(String(100), nullable=False, default="mock-nlp-model")
+    model_version: Mapped[str] = mapped_column(String(50), nullable=False, default="1.0.0")
+    pipeline_version: Mapped[str] = mapped_column(String(50), nullable=False, default="1.0.0")
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, nullable=False
     )
@@ -279,6 +287,9 @@ class CommitmentModel(Base):
         DateTime(timezone=True), nullable=True
     )
     evidence_segment_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    model_name: Mapped[str] = mapped_column(String(100), nullable=False, default="mock-nlp-model")
+    model_version: Mapped[str] = mapped_column(String(50), nullable=False, default="1.0.0")
+    pipeline_version: Mapped[str] = mapped_column(String(50), nullable=False, default="1.0.0")
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, nullable=False
     )
@@ -304,6 +315,9 @@ class IssueModel(Base):
     )
     resolution_meeting_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
     evidence_segment_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    model_name: Mapped[str] = mapped_column(String(100), nullable=False, default="mock-nlp-model")
+    model_version: Mapped[str] = mapped_column(String(50), nullable=False, default="1.0.0")
+    pipeline_version: Mapped[str] = mapped_column(String(50), nullable=False, default="1.0.0")
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, nullable=False
     )
@@ -327,6 +341,11 @@ class EventModel(Base):
     subject_entity_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
     payload_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     evidence_segment_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    model_name: Mapped[str] = mapped_column(
+        String(100), nullable=False, default="mock-temporal-engine"
+    )
+    model_version: Mapped[str] = mapped_column(String(50), nullable=False, default="1.0.0")
+    pipeline_version: Mapped[str] = mapped_column(String(50), nullable=False, default="1.0.0")
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, nullable=False
     )
@@ -348,6 +367,9 @@ class RelationshipModel(Base):
     relation_type: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
     segment_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
     confidence: Mapped[float] = mapped_column(Float, nullable=False, default=1.0)
+    model_name: Mapped[str] = mapped_column(String(100), nullable=False, default="mock-nlp-model")
+    model_version: Mapped[str] = mapped_column(String(50), nullable=False, default="1.0.0")
+    pipeline_version: Mapped[str] = mapped_column(String(50), nullable=False, default="1.0.0")
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, nullable=False
     )
@@ -367,6 +389,9 @@ class UtteranceClassificationModel(Base):
     segment_id: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
     classes_json: Mapped[list[str]] = mapped_column(JSON, nullable=False)
     confidence: Mapped[float] = mapped_column(Float, nullable=False, default=0.95)
+    model_name: Mapped[str] = mapped_column(String(100), nullable=False, default="mock-nlp-model")
+    model_version: Mapped[str] = mapped_column(String(50), nullable=False, default="1.0.0")
+    pipeline_version: Mapped[str] = mapped_column(String(50), nullable=False, default="1.0.0")
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, nullable=False
     )
@@ -393,6 +418,7 @@ class EmbeddingModel(Base):
         String(100), nullable=False, default="mock-sentence-embedder"
     )
     model_version: Mapped[str] = mapped_column(String(50), nullable=False, default="1.0.0")
+    pipeline_version: Mapped[str] = mapped_column(String(50), nullable=False, default="1.0.0")
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, nullable=False
     )
@@ -423,3 +449,20 @@ class EvidenceModel(Base):
     meeting: Mapped["MeetingModel"] = relationship("MeetingModel", back_populates="evidence")
 
     __table_args__ = (Index("ix_evidence_segment", "meeting_id", "segment_id"),)
+
+
+class AuditLogModel(Base):
+    """Relational table storing audit logs for security-sensitive operations."""
+
+    __tablename__ = "audit_logs"
+
+    id: Mapped[str] = mapped_column(String(100), primary_key=True, default=lambda: str(uuid4()))
+    timestamp: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, nullable=False, index=True
+    )
+    actor_id: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
+    action: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
+    resource_type: Mapped[str] = mapped_column(String(100), nullable=False)
+    resource_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    outcome: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
+    metadata_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)

@@ -6,7 +6,8 @@ import {
   Search,
   Network,
   History,
-  Activity
+  Activity,
+  Settings
 } from "lucide-react"
 
 export const Sidebar: React.FC = () => {
@@ -51,6 +52,13 @@ export const Sidebar: React.FC = () => {
         >
           <History size={18} />
           <span>Timeline Intelligence</span>
+        </NavLink>
+        <NavLink
+          to="/settings"
+          className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`}
+        >
+          <Settings size={18} />
+          <span>System Settings</span>
         </NavLink>
       </nav>
       <div className="sidebar-footer">

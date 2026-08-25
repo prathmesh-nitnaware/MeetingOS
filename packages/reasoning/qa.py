@@ -24,6 +24,9 @@ class QueryResponse(BaseModel):
     query_plan: QueryPlan
     confidence: float = 1.0
     reasoning_path: list[str] = Field(default_factory=list)
+    model_name: str = "mock-reasoner"
+    model_version: str = "1.0.0"
+    pipeline_version: str = "1.0.0"
 
 
 class RAGPipeline:
@@ -112,6 +115,9 @@ class RAGPipeline:
                 confidence=0.0,
                 reasoning_path=reasoning_path
                 + ["No relevant evidence found in organizational memory."],
+                model_name="mock-reasoner",
+                model_version="1.0.0",
+                pipeline_version="1.0.0",
             )
 
         # Build grounded synthesis based on evidence and retrieved facts
@@ -134,4 +140,7 @@ class RAGPipeline:
             query_plan=plan,
             confidence=reasoner_result.confidence,
             reasoning_path=reasoning_path + reasoner_result.reasoning_path,
+            model_name="mock-reasoner",
+            model_version="1.0.0",
+            pipeline_version="1.0.0",
         )

@@ -1,0 +1,697 @@
+{
+  "keyword_rag": [
+    {
+      "question_id": "q-01",
+      "question": "Which database was adopted for MeetingOS?",
+      "answer": "Based on the meeting records, the team evaluated MongoDB and PostgreSQL, and decided to adopt PostgreSQL with pgvector as the official database.",
+      "confidence": 0.95,
+      "evidence_count": 5
+    },
+    {
+      "question_id": "q-02",
+      "question": "Why did we adopt PostgreSQL instead of MongoDB?",
+      "answer": "Based on the meeting records, the team evaluated MongoDB and PostgreSQL, and decided to adopt PostgreSQL with pgvector as the official database.",
+      "confidence": 0.95,
+      "evidence_count": 3
+    },
+    {
+      "question_id": "q-03",
+      "question": "What task did Rahul Verma commit to finish by Friday?",
+      "answer": "Rahul Verma committed to finishing the database schema by Friday as agreed during the meeting.",
+      "confidence": 0.95,
+      "evidence_count": 4
+    },
+    {
+      "question_id": "q-04",
+      "question": "Who is the owner of the database migration task?",
+      "answer": "Based on the meeting records, the team evaluated MongoDB and PostgreSQL, and decided to adopt PostgreSQL with pgvector as the official database.",
+      "confidence": 0.95,
+      "evidence_count": 5
+    },
+    {
+      "question_id": "q-05",
+      "question": "What issue did Alex Rivera report regarding Redis?",
+      "answer": "According to the retrieved evidence: Alex Rivera: We have a timeout issue in Redis cache that is causing connection failures. Alex Rivera: I am tracking the Redis timeout issue, but it is still ongoing. Alex Rivera: Good news. The Redis ...",
+      "confidence": 0.95,
+      "evidence_count": 3
+    },
+    {
+      "question_id": "q-06",
+      "question": "Is the Redis timeout issue resolved now?",
+      "answer": "According to the retrieved evidence: Alex Rivera: We have a timeout issue in Redis cache that is causing connection failures. Alex Rivera: I am tracking the Redis timeout issue, but it is still ongoing. Alex Rivera: Good news. The Redis ...",
+      "confidence": 0.95,
+      "evidence_count": 3
+    },
+    {
+      "question_id": "q-07",
+      "question": "When is the database migration due according to latest commitments?",
+      "answer": "Based on the meeting records, the team evaluated MongoDB and PostgreSQL, and decided to adopt PostgreSQL with pgvector as the official database.",
+      "confidence": 0.95,
+      "evidence_count": 5
+    },
+    {
+      "question_id": "q-08",
+      "question": "What did the team decide about upgrading the Docker Compose config to Kubernetes?",
+      "answer": "According to the retrieved evidence: Rahul Verma: Let's finalize the database. We decided to adopt PostgreSQL for MeetingOS since pgvector fits our needs better than MongoDB....",
+      "confidence": 0.95,
+      "evidence_count": 1
+    },
+    {
+      "question_id": "q-09",
+      "question": "Who is working on the frontend portal?",
+      "answer": "According to the retrieved evidence: Priya Sharma: Excellent. I am still working on the database migration, and I am on track for Friday....",
+      "confidence": 0.95,
+      "evidence_count": 1
+    },
+    {
+      "question_id": "q-10",
+      "question": "What was decided regarding the production deployment server?",
+      "answer": "According to the retrieved evidence: Rahul Verma: Let's finalize the database. We decided to adopt PostgreSQL for MeetingOS since pgvector fits our needs better than MongoDB....",
+      "confidence": 0.95,
+      "evidence_count": 1
+    }
+  ],
+  "vector_rag": [
+    {
+      "question_id": "q-01",
+      "question": "Which database was adopted for MeetingOS?",
+      "answer": "Based on the meeting records, the team evaluated MongoDB and PostgreSQL, and decided to adopt PostgreSQL with pgvector as the official database.",
+      "confidence": 0.95,
+      "evidence_count": 3
+    },
+    {
+      "question_id": "q-02",
+      "question": "Why did we adopt PostgreSQL instead of MongoDB?",
+      "answer": "Based on the meeting records, the team evaluated MongoDB and PostgreSQL, and decided to adopt PostgreSQL with pgvector as the official database.",
+      "confidence": 0.95,
+      "evidence_count": 5
+    },
+    {
+      "question_id": "q-03",
+      "question": "What task did Rahul Verma commit to finish by Friday?",
+      "answer": "Rahul Verma committed to finishing the database schema by Friday as agreed during the meeting.",
+      "confidence": 0.95,
+      "evidence_count": 5
+    },
+    {
+      "question_id": "q-04",
+      "question": "Who is the owner of the database migration task?",
+      "answer": "Based on the meeting records, the team evaluated MongoDB and PostgreSQL, and decided to adopt PostgreSQL with pgvector as the official database.",
+      "confidence": 0.95,
+      "evidence_count": 3
+    },
+    {
+      "question_id": "q-05",
+      "question": "What issue did Alex Rivera report regarding Redis?",
+      "answer": "According to the retrieved evidence: Rahul Verma: Let's finalize the database. We decided to adopt PostgreSQL for MeetingOS since pgvector fits our needs better than MongoDB. Alex Rivera: I am tracking the Redis timeout issue, but it is ...",
+      "confidence": 0.95,
+      "evidence_count": 3
+    },
+    {
+      "question_id": "q-06",
+      "question": "Is the Redis timeout issue resolved now?",
+      "answer": "According to the retrieved evidence: Rahul Verma: We are kickstarting MeetingOS project. We need to choose between MongoDB and PostgreSQL for our core data layer. Priya Sharma: Understood. I will finish the database schema migration by F...",
+      "confidence": 0.95,
+      "evidence_count": 5
+    },
+    {
+      "question_id": "q-07",
+      "question": "When is the database migration due according to latest commitments?",
+      "answer": "Based on the meeting records, the team evaluated MongoDB and PostgreSQL, and decided to adopt PostgreSQL with pgvector as the official database.",
+      "confidence": 0.95,
+      "evidence_count": 4
+    },
+    {
+      "question_id": "q-08",
+      "question": "What did the team decide about upgrading the Docker Compose config to Kubernetes?",
+      "answer": "According to the retrieved evidence: Priya Sharma: MongoDB is flexible, but PostgreSQL with pgvector supports vector embedding lookups directly. Alex Rivera: Good news. The Redis timeout issue is resolved now. Priya Sharma: Excellent. I ...",
+      "confidence": 0.95,
+      "evidence_count": 3
+    },
+    {
+      "question_id": "q-09",
+      "question": "Who is working on the frontend portal?",
+      "answer": "According to the retrieved evidence: Alex Rivera: I am tracking the Redis timeout issue, but it is still ongoing. Rahul Verma: Let's finalize the database. We decided to adopt PostgreSQL for MeetingOS since pgvector fits our needs better...",
+      "confidence": 0.95,
+      "evidence_count": 3
+    },
+    {
+      "question_id": "q-10",
+      "question": "What was decided regarding the production deployment server?",
+      "answer": "According to the retrieved evidence: Priya Sharma: MongoDB is flexible, but PostgreSQL with pgvector supports vector embedding lookups directly. Priya Sharma: Excellent. I am still working on the database migration, and I am on track for...",
+      "confidence": 0.95,
+      "evidence_count": 4
+    }
+  ],
+  "meetingos_full": [
+    {
+      "question_id": "q-01",
+      "question": "Which database was adopted for MeetingOS?",
+      "answer": "Based on the meeting records, the team evaluated MongoDB and PostgreSQL, and decided to adopt PostgreSQL with pgvector as the official database.",
+      "confidence": 0.95,
+      "evidence_count": 5
+    },
+    {
+      "question_id": "q-02",
+      "question": "Why did we adopt PostgreSQL instead of MongoDB?",
+      "answer": "Based on the meeting records, the team evaluated MongoDB and PostgreSQL, and decided to adopt PostgreSQL with pgvector as the official database.",
+      "confidence": 0.95,
+      "evidence_count": 3
+    },
+    {
+      "question_id": "q-03",
+      "question": "What task did Rahul Verma commit to finish by Friday?",
+      "answer": "Rahul Verma committed to finishing the database schema by Friday as agreed during the meeting.",
+      "confidence": 0.95,
+      "evidence_count": 4
+    },
+    {
+      "question_id": "q-04",
+      "question": "Who is the owner of the database migration task?",
+      "answer": "Based on the meeting records, the team evaluated MongoDB and PostgreSQL, and decided to adopt PostgreSQL with pgvector as the official database.",
+      "confidence": 0.95,
+      "evidence_count": 5
+    },
+    {
+      "question_id": "q-05",
+      "question": "What issue did Alex Rivera report regarding Redis?",
+      "answer": "According to the retrieved evidence: Alex Rivera: I am tracking the Redis timeout issue, but it is still ongoing. Alex Rivera: We have a timeout issue in Redis cache that is causing connection failures. Alex Rivera: Good news. The Redis ...",
+      "confidence": 0.95,
+      "evidence_count": 3
+    },
+    {
+      "question_id": "q-06",
+      "question": "Is the Redis timeout issue resolved now?",
+      "answer": "According to the retrieved evidence: Alex Rivera: We have a timeout issue in Redis cache that is causing connection failures. Alex Rivera: I am tracking the Redis timeout issue, but it is still ongoing. Alex Rivera: Good news. The Redis ...",
+      "confidence": 0.95,
+      "evidence_count": 3
+    },
+    {
+      "question_id": "q-07",
+      "question": "When is the database migration due according to latest commitments?",
+      "answer": "Based on the meeting records, the team evaluated MongoDB and PostgreSQL, and decided to adopt PostgreSQL with pgvector as the official database.",
+      "confidence": 0.95,
+      "evidence_count": 5
+    },
+    {
+      "question_id": "q-08",
+      "question": "What did the team decide about upgrading the Docker Compose config to Kubernetes?",
+      "answer": "According to the retrieved evidence: Rahul Verma: Let's finalize the database. We decided to adopt PostgreSQL for MeetingOS since pgvector fits our needs better than MongoDB....",
+      "confidence": 0.95,
+      "evidence_count": 1
+    },
+    {
+      "question_id": "q-09",
+      "question": "Who is working on the frontend portal?",
+      "answer": "According to the retrieved evidence: Priya Sharma: Excellent. I am still working on the database migration, and I am on track for Friday....",
+      "confidence": 0.95,
+      "evidence_count": 1
+    },
+    {
+      "question_id": "q-10",
+      "question": "What was decided regarding the production deployment server?",
+      "answer": "According to the retrieved evidence: Rahul Verma: Let's finalize the database. We decided to adopt PostgreSQL for MeetingOS since pgvector fits our needs better than MongoDB....",
+      "confidence": 0.95,
+      "evidence_count": 1
+    }
+  ],
+  "ablation_no_graph": [
+    {
+      "question_id": "q-01",
+      "question": "Which database was adopted for MeetingOS?",
+      "answer": "Based on the meeting records, the team evaluated MongoDB and PostgreSQL, and decided to adopt PostgreSQL with pgvector as the official database.",
+      "confidence": 0.95,
+      "evidence_count": 5
+    },
+    {
+      "question_id": "q-02",
+      "question": "Why did we adopt PostgreSQL instead of MongoDB?",
+      "answer": "Based on the meeting records, the team evaluated MongoDB and PostgreSQL, and decided to adopt PostgreSQL with pgvector as the official database.",
+      "confidence": 0.95,
+      "evidence_count": 3
+    },
+    {
+      "question_id": "q-03",
+      "question": "What task did Rahul Verma commit to finish by Friday?",
+      "answer": "Rahul Verma committed to finishing the database schema by Friday as agreed during the meeting.",
+      "confidence": 0.95,
+      "evidence_count": 4
+    },
+    {
+      "question_id": "q-04",
+      "question": "Who is the owner of the database migration task?",
+      "answer": "Based on the meeting records, the team evaluated MongoDB and PostgreSQL, and decided to adopt PostgreSQL with pgvector as the official database.",
+      "confidence": 0.95,
+      "evidence_count": 5
+    },
+    {
+      "question_id": "q-05",
+      "question": "What issue did Alex Rivera report regarding Redis?",
+      "answer": "According to the retrieved evidence: Alex Rivera: I am tracking the Redis timeout issue, but it is still ongoing. Alex Rivera: We have a timeout issue in Redis cache that is causing connection failures. Alex Rivera: Good news. The Redis ...",
+      "confidence": 0.95,
+      "evidence_count": 3
+    },
+    {
+      "question_id": "q-06",
+      "question": "Is the Redis timeout issue resolved now?",
+      "answer": "According to the retrieved evidence: Alex Rivera: We have a timeout issue in Redis cache that is causing connection failures. Alex Rivera: I am tracking the Redis timeout issue, but it is still ongoing. Alex Rivera: Good news. The Redis ...",
+      "confidence": 0.95,
+      "evidence_count": 3
+    },
+    {
+      "question_id": "q-07",
+      "question": "When is the database migration due according to latest commitments?",
+      "answer": "Based on the meeting records, the team evaluated MongoDB and PostgreSQL, and decided to adopt PostgreSQL with pgvector as the official database.",
+      "confidence": 0.95,
+      "evidence_count": 5
+    },
+    {
+      "question_id": "q-08",
+      "question": "What did the team decide about upgrading the Docker Compose config to Kubernetes?",
+      "answer": "According to the retrieved evidence: Rahul Verma: Let's finalize the database. We decided to adopt PostgreSQL for MeetingOS since pgvector fits our needs better than MongoDB....",
+      "confidence": 0.95,
+      "evidence_count": 1
+    },
+    {
+      "question_id": "q-09",
+      "question": "Who is working on the frontend portal?",
+      "answer": "According to the retrieved evidence: Priya Sharma: Excellent. I am still working on the database migration, and I am on track for Friday....",
+      "confidence": 0.95,
+      "evidence_count": 1
+    },
+    {
+      "question_id": "q-10",
+      "question": "What was decided regarding the production deployment server?",
+      "answer": "According to the retrieved evidence: Rahul Verma: Let's finalize the database. We decided to adopt PostgreSQL for MeetingOS since pgvector fits our needs better than MongoDB....",
+      "confidence": 0.95,
+      "evidence_count": 1
+    }
+  ],
+  "ablation_no_temporal": [
+    {
+      "question_id": "q-01",
+      "question": "Which database was adopted for MeetingOS?",
+      "answer": "Based on the meeting records, the team evaluated MongoDB and PostgreSQL, and decided to adopt PostgreSQL with pgvector as the official database.",
+      "confidence": 0.95,
+      "evidence_count": 5
+    },
+    {
+      "question_id": "q-02",
+      "question": "Why did we adopt PostgreSQL instead of MongoDB?",
+      "answer": "Based on the meeting records, the team evaluated MongoDB and PostgreSQL, and decided to adopt PostgreSQL with pgvector as the official database.",
+      "confidence": 0.95,
+      "evidence_count": 3
+    },
+    {
+      "question_id": "q-03",
+      "question": "What task did Rahul Verma commit to finish by Friday?",
+      "answer": "Rahul Verma committed to finishing the database schema by Friday as agreed during the meeting.",
+      "confidence": 0.95,
+      "evidence_count": 4
+    },
+    {
+      "question_id": "q-04",
+      "question": "Who is the owner of the database migration task?",
+      "answer": "Based on the meeting records, the team evaluated MongoDB and PostgreSQL, and decided to adopt PostgreSQL with pgvector as the official database.",
+      "confidence": 0.95,
+      "evidence_count": 5
+    },
+    {
+      "question_id": "q-05",
+      "question": "What issue did Alex Rivera report regarding Redis?",
+      "answer": "According to the retrieved evidence: Alex Rivera: I am tracking the Redis timeout issue, but it is still ongoing. Alex Rivera: We have a timeout issue in Redis cache that is causing connection failures. Alex Rivera: Good news. The Redis ...",
+      "confidence": 0.95,
+      "evidence_count": 3
+    },
+    {
+      "question_id": "q-06",
+      "question": "Is the Redis timeout issue resolved now?",
+      "answer": "According to the retrieved evidence: Alex Rivera: We have a timeout issue in Redis cache that is causing connection failures. Alex Rivera: I am tracking the Redis timeout issue, but it is still ongoing. Alex Rivera: Good news. The Redis ...",
+      "confidence": 0.95,
+      "evidence_count": 3
+    },
+    {
+      "question_id": "q-07",
+      "question": "When is the database migration due according to latest commitments?",
+      "answer": "Based on the meeting records, the team evaluated MongoDB and PostgreSQL, and decided to adopt PostgreSQL with pgvector as the official database.",
+      "confidence": 0.95,
+      "evidence_count": 5
+    },
+    {
+      "question_id": "q-08",
+      "question": "What did the team decide about upgrading the Docker Compose config to Kubernetes?",
+      "answer": "According to the retrieved evidence: Rahul Verma: Let's finalize the database. We decided to adopt PostgreSQL for MeetingOS since pgvector fits our needs better than MongoDB....",
+      "confidence": 0.95,
+      "evidence_count": 1
+    },
+    {
+      "question_id": "q-09",
+      "question": "Who is working on the frontend portal?",
+      "answer": "According to the retrieved evidence: Priya Sharma: Excellent. I am still working on the database migration, and I am on track for Friday....",
+      "confidence": 0.95,
+      "evidence_count": 1
+    },
+    {
+      "question_id": "q-10",
+      "question": "What was decided regarding the production deployment server?",
+      "answer": "According to the retrieved evidence: Rahul Verma: Let's finalize the database. We decided to adopt PostgreSQL for MeetingOS since pgvector fits our needs better than MongoDB....",
+      "confidence": 0.95,
+      "evidence_count": 1
+    }
+  ],
+  "ablation_keyword_only": [
+    {
+      "question_id": "q-01",
+      "question": "Which database was adopted for MeetingOS?",
+      "answer": "Based on the meeting records, the team evaluated MongoDB and PostgreSQL, and decided to adopt PostgreSQL with pgvector as the official database.",
+      "confidence": 0.95,
+      "evidence_count": 5
+    },
+    {
+      "question_id": "q-02",
+      "question": "Why did we adopt PostgreSQL instead of MongoDB?",
+      "answer": "Based on the meeting records, the team evaluated MongoDB and PostgreSQL, and decided to adopt PostgreSQL with pgvector as the official database.",
+      "confidence": 0.95,
+      "evidence_count": 3
+    },
+    {
+      "question_id": "q-03",
+      "question": "What task did Rahul Verma commit to finish by Friday?",
+      "answer": "Rahul Verma committed to finishing the database schema by Friday as agreed during the meeting.",
+      "confidence": 0.95,
+      "evidence_count": 4
+    },
+    {
+      "question_id": "q-04",
+      "question": "Who is the owner of the database migration task?",
+      "answer": "Based on the meeting records, the team evaluated MongoDB and PostgreSQL, and decided to adopt PostgreSQL with pgvector as the official database.",
+      "confidence": 0.95,
+      "evidence_count": 5
+    },
+    {
+      "question_id": "q-05",
+      "question": "What issue did Alex Rivera report regarding Redis?",
+      "answer": "According to the retrieved evidence: Alex Rivera: We have a timeout issue in Redis cache that is causing connection failures. Alex Rivera: I am tracking the Redis timeout issue, but it is still ongoing. Alex Rivera: Good news. The Redis ...",
+      "confidence": 0.95,
+      "evidence_count": 3
+    },
+    {
+      "question_id": "q-06",
+      "question": "Is the Redis timeout issue resolved now?",
+      "answer": "According to the retrieved evidence: Alex Rivera: We have a timeout issue in Redis cache that is causing connection failures. Alex Rivera: I am tracking the Redis timeout issue, but it is still ongoing. Alex Rivera: Good news. The Redis ...",
+      "confidence": 0.95,
+      "evidence_count": 3
+    },
+    {
+      "question_id": "q-07",
+      "question": "When is the database migration due according to latest commitments?",
+      "answer": "Based on the meeting records, the team evaluated MongoDB and PostgreSQL, and decided to adopt PostgreSQL with pgvector as the official database.",
+      "confidence": 0.95,
+      "evidence_count": 5
+    },
+    {
+      "question_id": "q-08",
+      "question": "What did the team decide about upgrading the Docker Compose config to Kubernetes?",
+      "answer": "According to the retrieved evidence: Rahul Verma: Let's finalize the database. We decided to adopt PostgreSQL for MeetingOS since pgvector fits our needs better than MongoDB....",
+      "confidence": 0.95,
+      "evidence_count": 1
+    },
+    {
+      "question_id": "q-09",
+      "question": "Who is working on the frontend portal?",
+      "answer": "According to the retrieved evidence: Priya Sharma: Excellent. I am still working on the database migration, and I am on track for Friday....",
+      "confidence": 0.95,
+      "evidence_count": 1
+    },
+    {
+      "question_id": "q-10",
+      "question": "What was decided regarding the production deployment server?",
+      "answer": "According to the retrieved evidence: Rahul Verma: Let's finalize the database. We decided to adopt PostgreSQL for MeetingOS since pgvector fits our needs better than MongoDB....",
+      "confidence": 0.95,
+      "evidence_count": 1
+    }
+  ],
+  "ablation_vector_only": [
+    {
+      "question_id": "q-01",
+      "question": "Which database was adopted for MeetingOS?",
+      "answer": "Based on the meeting records, the team evaluated MongoDB and PostgreSQL, and decided to adopt PostgreSQL with pgvector as the official database.",
+      "confidence": 0.95,
+      "evidence_count": 3
+    },
+    {
+      "question_id": "q-02",
+      "question": "Why did we adopt PostgreSQL instead of MongoDB?",
+      "answer": "Based on the meeting records, the team evaluated MongoDB and PostgreSQL, and decided to adopt PostgreSQL with pgvector as the official database.",
+      "confidence": 0.95,
+      "evidence_count": 5
+    },
+    {
+      "question_id": "q-03",
+      "question": "What task did Rahul Verma commit to finish by Friday?",
+      "answer": "Rahul Verma committed to finishing the database schema by Friday as agreed during the meeting.",
+      "confidence": 0.95,
+      "evidence_count": 5
+    },
+    {
+      "question_id": "q-04",
+      "question": "Who is the owner of the database migration task?",
+      "answer": "Based on the meeting records, the team evaluated MongoDB and PostgreSQL, and decided to adopt PostgreSQL with pgvector as the official database.",
+      "confidence": 0.95,
+      "evidence_count": 3
+    },
+    {
+      "question_id": "q-05",
+      "question": "What issue did Alex Rivera report regarding Redis?",
+      "answer": "According to the retrieved evidence: Rahul Verma: Let's finalize the database. We decided to adopt PostgreSQL for MeetingOS since pgvector fits our needs better than MongoDB. Alex Rivera: I am tracking the Redis timeout issue, but it is ...",
+      "confidence": 0.95,
+      "evidence_count": 3
+    },
+    {
+      "question_id": "q-06",
+      "question": "Is the Redis timeout issue resolved now?",
+      "answer": "According to the retrieved evidence: Rahul Verma: We are kickstarting MeetingOS project. We need to choose between MongoDB and PostgreSQL for our core data layer. Priya Sharma: Understood. I will finish the database schema migration by F...",
+      "confidence": 0.95,
+      "evidence_count": 5
+    },
+    {
+      "question_id": "q-07",
+      "question": "When is the database migration due according to latest commitments?",
+      "answer": "Based on the meeting records, the team evaluated MongoDB and PostgreSQL, and decided to adopt PostgreSQL with pgvector as the official database.",
+      "confidence": 0.95,
+      "evidence_count": 4
+    },
+    {
+      "question_id": "q-08",
+      "question": "What did the team decide about upgrading the Docker Compose config to Kubernetes?",
+      "answer": "According to the retrieved evidence: Priya Sharma: MongoDB is flexible, but PostgreSQL with pgvector supports vector embedding lookups directly. Alex Rivera: Good news. The Redis timeout issue is resolved now. Priya Sharma: Excellent. I ...",
+      "confidence": 0.95,
+      "evidence_count": 3
+    },
+    {
+      "question_id": "q-09",
+      "question": "Who is working on the frontend portal?",
+      "answer": "According to the retrieved evidence: Alex Rivera: I am tracking the Redis timeout issue, but it is still ongoing. Rahul Verma: Let's finalize the database. We decided to adopt PostgreSQL for MeetingOS since pgvector fits our needs better...",
+      "confidence": 0.95,
+      "evidence_count": 3
+    },
+    {
+      "question_id": "q-10",
+      "question": "What was decided regarding the production deployment server?",
+      "answer": "According to the retrieved evidence: Priya Sharma: MongoDB is flexible, but PostgreSQL with pgvector supports vector embedding lookups directly. Priya Sharma: Excellent. I am still working on the database migration, and I am on track for...",
+      "confidence": 0.95,
+      "evidence_count": 4
+    }
+  ],
+  "ablation_no_metadata": [
+    {
+      "question_id": "q-01",
+      "question": "Which database was adopted for MeetingOS?",
+      "answer": "Based on the meeting records, the team evaluated MongoDB and PostgreSQL, and decided to adopt PostgreSQL with pgvector as the official database.",
+      "confidence": 0.95,
+      "evidence_count": 5
+    },
+    {
+      "question_id": "q-02",
+      "question": "Why did we adopt PostgreSQL instead of MongoDB?",
+      "answer": "Based on the meeting records, the team evaluated MongoDB and PostgreSQL, and decided to adopt PostgreSQL with pgvector as the official database.",
+      "confidence": 0.95,
+      "evidence_count": 3
+    },
+    {
+      "question_id": "q-03",
+      "question": "What task did Rahul Verma commit to finish by Friday?",
+      "answer": "Rahul Verma committed to finishing the database schema by Friday as agreed during the meeting.",
+      "confidence": 0.95,
+      "evidence_count": 4
+    },
+    {
+      "question_id": "q-04",
+      "question": "Who is the owner of the database migration task?",
+      "answer": "Based on the meeting records, the team evaluated MongoDB and PostgreSQL, and decided to adopt PostgreSQL with pgvector as the official database.",
+      "confidence": 0.95,
+      "evidence_count": 5
+    },
+    {
+      "question_id": "q-05",
+      "question": "What issue did Alex Rivera report regarding Redis?",
+      "answer": "According to the retrieved evidence: Alex Rivera: I am tracking the Redis timeout issue, but it is still ongoing. Alex Rivera: We have a timeout issue in Redis cache that is causing connection failures. Alex Rivera: Good news. The Redis ...",
+      "confidence": 0.95,
+      "evidence_count": 3
+    },
+    {
+      "question_id": "q-06",
+      "question": "Is the Redis timeout issue resolved now?",
+      "answer": "According to the retrieved evidence: Alex Rivera: We have a timeout issue in Redis cache that is causing connection failures. Alex Rivera: I am tracking the Redis timeout issue, but it is still ongoing. Alex Rivera: Good news. The Redis ...",
+      "confidence": 0.95,
+      "evidence_count": 3
+    },
+    {
+      "question_id": "q-07",
+      "question": "When is the database migration due according to latest commitments?",
+      "answer": "Based on the meeting records, the team evaluated MongoDB and PostgreSQL, and decided to adopt PostgreSQL with pgvector as the official database.",
+      "confidence": 0.95,
+      "evidence_count": 5
+    },
+    {
+      "question_id": "q-08",
+      "question": "What did the team decide about upgrading the Docker Compose config to Kubernetes?",
+      "answer": "According to the retrieved evidence: Rahul Verma: Let's finalize the database. We decided to adopt PostgreSQL for MeetingOS since pgvector fits our needs better than MongoDB....",
+      "confidence": 0.95,
+      "evidence_count": 1
+    },
+    {
+      "question_id": "q-09",
+      "question": "Who is working on the frontend portal?",
+      "answer": "According to the retrieved evidence: Priya Sharma: Excellent. I am still working on the database migration, and I am on track for Friday....",
+      "confidence": 0.95,
+      "evidence_count": 1
+    },
+    {
+      "question_id": "q-10",
+      "question": "What was decided regarding the production deployment server?",
+      "answer": "According to the retrieved evidence: Rahul Verma: Let's finalize the database. We decided to adopt PostgreSQL for MeetingOS since pgvector fits our needs better than MongoDB....",
+      "confidence": 0.95,
+      "evidence_count": 1
+    }
+  ],
+  "ablation_no_evidence": [
+    {
+      "question_id": "q-01",
+      "question": "Which database was adopted for MeetingOS?",
+      "answer": "The available meeting memory does not establish an answer to this question.",
+      "confidence": 0.0,
+      "evidence_count": 0
+    },
+    {
+      "question_id": "q-02",
+      "question": "Why did we adopt PostgreSQL instead of MongoDB?",
+      "answer": "The available meeting memory does not establish an answer to this question.",
+      "confidence": 0.0,
+      "evidence_count": 0
+    },
+    {
+      "question_id": "q-03",
+      "question": "What task did Rahul Verma commit to finish by Friday?",
+      "answer": "The available meeting memory does not establish an answer to this question.",
+      "confidence": 0.0,
+      "evidence_count": 0
+    },
+    {
+      "question_id": "q-04",
+      "question": "Who is the owner of the database migration task?",
+      "answer": "The available meeting memory does not establish an answer to this question.",
+      "confidence": 0.0,
+      "evidence_count": 0
+    },
+    {
+      "question_id": "q-05",
+      "question": "What issue did Alex Rivera report regarding Redis?",
+      "answer": "The available meeting memory does not establish an answer to this question.",
+      "confidence": 0.0,
+      "evidence_count": 0
+    },
+    {
+      "question_id": "q-06",
+      "question": "Is the Redis timeout issue resolved now?",
+      "answer": "The available meeting memory does not establish an answer to this question.",
+      "confidence": 0.0,
+      "evidence_count": 0
+    },
+    {
+      "question_id": "q-07",
+      "question": "When is the database migration due according to latest commitments?",
+      "answer": "The available meeting memory does not establish an answer to this question.",
+      "confidence": 0.0,
+      "evidence_count": 0
+    },
+    {
+      "question_id": "q-08",
+      "question": "What did the team decide about upgrading the Docker Compose config to Kubernetes?",
+      "answer": "The available meeting memory does not establish an answer to this question.",
+      "confidence": 0.0,
+      "evidence_count": 0
+    },
+    {
+      "question_id": "q-09",
+      "question": "Who is working on the frontend portal?",
+      "answer": "The available meeting memory does not establish an answer to this question.",
+      "confidence": 0.0,
+      "evidence_count": 0
+    },
+    {
+      "question_id": "q-10",
+      "question": "What was decided regarding the production deployment server?",
+      "answer": "The available meeting memory does not establish an answer to this question.",
+      "confidence": 0.0,
+      "evidence_count": 0
+    }
+  ],
+  "aggregate_metrics": {
+    "keyword_rag": {
+      "avg_answer_accuracy": 0.2,
+      "avg_retrieval_recall": 0.7,
+      "avg_entity_recall": 0.7
+    },
+    "vector_rag": {
+      "avg_answer_accuracy": 0.1,
+      "avg_retrieval_recall": 0.2,
+      "avg_entity_recall": 0.6
+    },
+    "meetingos_full": {
+      "avg_answer_accuracy": 0.2,
+      "avg_retrieval_recall": 0.7,
+      "avg_entity_recall": 0.7
+    },
+    "ablation_no_graph": {
+      "avg_answer_accuracy": 0.2,
+      "avg_retrieval_recall": 0.7,
+      "avg_entity_recall": 0.7
+    },
+    "ablation_no_temporal": {
+      "avg_answer_accuracy": 0.2,
+      "avg_retrieval_recall": 0.7,
+      "avg_entity_recall": 0.7
+    },
+    "ablation_keyword_only": {
+      "avg_answer_accuracy": 0.2,
+      "avg_retrieval_recall": 0.7,
+      "avg_entity_recall": 0.7
+    },
+    "ablation_vector_only": {
+      "avg_answer_accuracy": 0.1,
+      "avg_retrieval_recall": 0.2,
+      "avg_entity_recall": 0.6
+    },
+    "ablation_no_metadata": {
+      "avg_answer_accuracy": 0.2,
+      "avg_retrieval_recall": 0.7,
+      "avg_entity_recall": 0.7
+    },
+    "ablation_no_evidence": {
+      "avg_answer_accuracy": 0.3,
+      "avg_retrieval_recall": 0.3,
+      "avg_entity_recall": 0.2
+    }
+  }
+}
