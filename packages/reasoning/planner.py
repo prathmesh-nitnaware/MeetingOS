@@ -141,6 +141,39 @@ class QueryPlanner:
                     canonical = "MeetingOS"
                 entities.append(canonical)
 
+        # Extract capitalized named entities from query
+        stop_words = {
+            "what",
+            "which",
+            "who",
+            "whom",
+            "where",
+            "when",
+            "why",
+            "how",
+            "did",
+            "does",
+            "is",
+            "are",
+            "we",
+            "the",
+            "a",
+            "an",
+            "tell",
+            "show",
+            "give",
+            "find",
+            "about",
+            "our",
+        }
+        for word in re.findall(r"\b[A-Z][a-zA-Z0-9_\-]+\b", question):
+            if (
+                word.lower() not in stop_words
+                and word not in entities
+                and (not person or word.lower() not in person.lower())
+            ):
+                entities.append(word)
+
         # 5. Detect Time Range
         time_range: str | None = None
         time_patterns = [

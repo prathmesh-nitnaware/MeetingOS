@@ -1,5 +1,6 @@
+from apps.api.auth import UserIdentity, require_viewer
 from apps.api.config import settings
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from packages.agents.context import AgentResult
 from packages.agents.orchestrator import AgentOrchestrator
 from packages.memory.database import get_db_session
@@ -25,6 +26,7 @@ async def query_organizational_memory(
 @router.post("/query/agentic", response_model=AgentResult)
 async def query_organizational_memory_agentic(
     request: QueryRequest,
+    _user: UserIdentity = Depends(require_viewer),
 ) -> AgentResult:
     """Answer historical organizational questions using a controlled multi-agent reasoning system."""
     async with get_db_session(settings.database_url) as session:

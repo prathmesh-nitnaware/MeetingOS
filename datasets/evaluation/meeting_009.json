@@ -1,0 +1,40 @@
+{
+  "meeting_id": "meet-eval-009",
+  "title": "Production Launch Planning",
+  "meeting_date": "2026-09-08T10:00:00Z",
+  "source_type": "audio/wav",
+  "participants": [
+    {"id": "p-rahul-m9", "canonical_name": "Rahul Verma"},
+    {"id": "p-priya-m9", "canonical_name": "Priya Sharma"},
+    {"id": "p-nisha-m9", "canonical_name": "Nisha Patel"},
+    {"id": "p-kiran-m9", "canonical_name": "Kiran Das"}
+  ],
+  "speakers": [
+    {"speaker_id": "spk_rahul", "name": "Rahul Verma"},
+    {"speaker_id": "spk_priya", "name": "Priya Sharma"},
+    {"speaker_id": "spk_nisha", "name": "Nisha Patel"},
+    {"speaker_id": "spk_kiran", "name": "Kiran Das"}
+  ],
+  "segments": [
+    {
+      "segment_id": "seg-m9-01", "sequence": 0, "speaker_id": "spk_rahul",
+      "start_time": 0.0, "end_time": 20.0,
+      "text": "Rahul Verma: The Redis-based rate limiter is complete and deployed. The token bucket algorithm implementation passed all load tests."
+    },
+    {
+      "segment_id": "seg-m9-02", "sequence": 1, "speaker_id": "spk_nisha",
+      "start_time": 20.5, "end_time": 40.0,
+      "text": "Nisha Patel: The NLP pipeline is complete. Entity extraction with spaCy and co-reference resolution are working. The NLP pipeline integration task is closed."
+    },
+    {
+      "segment_id": "seg-m9-03", "sequence": 2, "speaker_id": "spk_priya",
+      "start_time": 40.5, "end_time": 58.0,
+      "text": "Priya Sharma: We decided to use pgvector extension for vector similarity search in PostgreSQL. This decision is linked to the earlier PostgreSQL adoption decision."
+    },
+    {
+      "segment_id": "seg-m9-04", "sequence": 3, "speaker_id": "spk_kiran",
+      "start_time": 58.5, "end_time": 78.0,
+      "text": "Kiran Das: The Kubernetes pod startup issue is resolved. I optimized Docker images from 1.2GB to 450MB using multi-stage builds. The Kubernetes cluster deadline of September 15th is on track."
+    }
+  ]
+}

@@ -1,0 +1,1997 @@
+[
+  {
+    "question_id": "eq-01",
+    "category": "factual_lookup",
+    "query": "Which database was adopted as the primary data store for MeetingOS?",
+    "agents_invoked": [
+      "planner",
+      "temporal",
+      "retrieval",
+      "graph",
+      "evidence",
+      "answer"
+    ],
+    "execution_order": [
+      "planner",
+      "temporal",
+      "retrieval",
+      "graph",
+      "evidence",
+      "answer"
+    ],
+    "parallel_execution_groups": [
+      [
+        "retrieval",
+        "graph",
+        "temporal"
+      ]
+    ],
+    "evidence_collected": 2,
+    "confidence": 0.85,
+    "final_answer": "Based on the meeting records, the team evaluated MongoDB and PostgreSQL, and decided to adopt PostgreSQL with pgvector as the official database.",
+    "citations": [
+      "Database Decision Sync (2026-08-22) - 0:00",
+      "Database Migration Planning (2026-08-22) - 0:00"
+    ],
+    "latency_per_stage": {
+      "planner": 0.0031,
+      "temporal": 0.0221,
+      "retrieval": 0.0273,
+      "graph": 0.031,
+      "evidence": 0.0001,
+      "answer": 0.0005
+    },
+    "insufficient_evidence": false
+  },
+  {
+    "question_id": "eq-02",
+    "category": "factual_lookup",
+    "query": "What extension is used in PostgreSQL for vector similarity lookups?",
+    "agents_invoked": [
+      "planner",
+      "temporal",
+      "graph",
+      "retrieval",
+      "evidence",
+      "answer"
+    ],
+    "execution_order": [
+      "planner",
+      "temporal",
+      "graph",
+      "retrieval",
+      "evidence",
+      "answer"
+    ],
+    "parallel_execution_groups": [
+      [
+        "retrieval",
+        "graph",
+        "temporal"
+      ]
+    ],
+    "evidence_collected": 7,
+    "confidence": 0.6337142857142857,
+    "final_answer": "Based on the meeting records, the team evaluated MongoDB and PostgreSQL, and decided to adopt PostgreSQL with pgvector as the official database.",
+    "citations": [
+      "Database Decision Sync (2026-08-22) - 0:00",
+      "Production Launch Planning (2026-09-08) - 0:00",
+      "Security and Compliance Review (2026-09-10) - 0:00",
+      "API Design and Versioning (2026-09-12) - 0:00",
+      "Kickoff and Database Evaluation (2026-08-20) - 0:10",
+      "Kickoff and Database Evaluation (2026-08-20) - 0:00",
+      "Phase 10 Final Release Architecture and Retrospective (2026-09-18) - 0:25"
+    ],
+    "latency_per_stage": {
+      "planner": 0.0014,
+      "temporal": 0.0169,
+      "graph": 0.0401,
+      "retrieval": 0.0498,
+      "evidence": 0.0,
+      "answer": 0.0006
+    },
+    "insufficient_evidence": false
+  },
+  {
+    "question_id": "eq-03",
+    "category": "factual_lookup",
+    "query": "What NLP backbone library was selected for entity extraction?",
+    "agents_invoked": [
+      "planner",
+      "graph",
+      "retrieval",
+      "temporal",
+      "evidence",
+      "answer"
+    ],
+    "execution_order": [
+      "planner",
+      "graph",
+      "retrieval",
+      "temporal",
+      "evidence",
+      "answer"
+    ],
+    "parallel_execution_groups": [
+      [
+        "retrieval",
+        "graph",
+        "temporal"
+      ]
+    ],
+    "evidence_collected": 1,
+    "confidence": 0.85,
+    "final_answer": "According to the retrieved evidence: Action: Nisha Patel: I will own the NLP pipeline integration task. I commit to delivering the entity extractor prototype by end of sprint, which is September 5th. (Owner: spk_nisha, Status: In Progres...",
+    "citations": [
+      "Sprint Review \u2014 Week 3 (2026-08-25) - 0:00"
+    ],
+    "latency_per_stage": {
+      "planner": 0.0006,
+      "graph": 0.0066,
+      "retrieval": 0.0133,
+      "temporal": 0.0121,
+      "evidence": 0.0,
+      "answer": 0.0004
+    },
+    "insufficient_evidence": false
+  },
+  {
+    "question_id": "eq-04",
+    "category": "factual_lookup",
+    "query": "What authentication mechanism is used for API endpoints?",
+    "agents_invoked": [
+      "planner",
+      "graph",
+      "temporal",
+      "retrieval",
+      "evidence",
+      "answer"
+    ],
+    "execution_order": [
+      "planner",
+      "graph",
+      "temporal",
+      "retrieval",
+      "evidence",
+      "answer"
+    ],
+    "parallel_execution_groups": [
+      [
+        "retrieval",
+        "graph",
+        "temporal"
+      ]
+    ],
+    "evidence_collected": 7,
+    "confidence": 0.7713428571428571,
+    "final_answer": "According to the retrieved evidence: Decision: We decided to implement JWT-based authentication for all API endpoints. Priya Sharma will own the auth module implementation. Deadline is September 18th. (Status: Approved) Decision: We deci...",
+    "citations": [
+      "Security and Compliance Review (2026-09-10) - 0:00",
+      "API Design and Versioning (2026-09-12) - 0:00",
+      "Cross-Team Integration Planning (2026-09-15) - 0:00"
+    ],
+    "latency_per_stage": {
+      "planner": 0.0004,
+      "graph": 0.0068,
+      "temporal": 0.0127,
+      "retrieval": 0.0362,
+      "evidence": 0.0,
+      "answer": 0.0007
+    },
+    "insufficient_evidence": false
+  },
+  {
+    "question_id": "eq-05",
+    "category": "factual_lookup",
+    "query": "What algorithm is used for the Redis rate limiter?",
+    "agents_invoked": [
+      "planner",
+      "temporal",
+      "graph",
+      "retrieval",
+      "evidence",
+      "answer"
+    ],
+    "execution_order": [
+      "planner",
+      "temporal",
+      "graph",
+      "retrieval",
+      "evidence",
+      "answer"
+    ],
+    "parallel_execution_groups": [
+      [
+        "retrieval",
+        "graph",
+        "temporal"
+      ]
+    ],
+    "evidence_collected": 14,
+    "confidence": 0.8292857142857143,
+    "final_answer": "According to the retrieved evidence: Decision: We need an API rate limiter. We decided to implement Redis-based rate limiting using the token bucket algorithm. Rahul Verma owns this task, due by September 8th. (Status: Approved) Decision...",
+    "citations": [
+      "NLP Pipeline Design Session (2026-08-29) - 0:00",
+      "Redis Incident Post-Mortem (2026-09-03) - 0:00",
+      "Cross-Team Integration Planning (2026-09-15) - 0:00",
+      "Infrastructure Architecture Review (2026-08-27) - 0:00",
+      "Kickoff and Database Evaluation (2026-08-20) - 0:00",
+      "Database Decision Sync (2026-08-22) - 0:00",
+      "Deployment and Final Reconciliation (2026-08-24) - 0:00",
+      "Database Migration Planning (2026-08-22) - 0:00",
+      "Sprint Review \u2014 Week 3 (2026-08-25) - 0:00",
+      "Security and Compliance Review (2026-09-10) - 0:00",
+      "Production Launch Planning (2026-09-08) - 0:00"
+    ],
+    "latency_per_stage": {
+      "planner": 0.0003,
+      "temporal": 0.0186,
+      "graph": 0.0532,
+      "retrieval": 0.0611,
+      "evidence": 0.0,
+      "answer": 0.0008
+    },
+    "insufficient_evidence": false
+  },
+  {
+    "question_id": "eq-06",
+    "category": "entity_lookup",
+    "query": "Who investigated the Redis connection pool root cause?",
+    "agents_invoked": [
+      "planner",
+      "temporal",
+      "graph",
+      "retrieval",
+      "evidence",
+      "answer"
+    ],
+    "execution_order": [
+      "planner",
+      "temporal",
+      "graph",
+      "retrieval",
+      "evidence",
+      "answer"
+    ],
+    "parallel_execution_groups": [
+      [
+        "retrieval",
+        "graph",
+        "temporal"
+      ]
+    ],
+    "evidence_collected": 12,
+    "confidence": 0.85,
+    "final_answer": "According to the retrieved evidence: Decision: We need an API rate limiter. We decided to implement Redis-based rate limiting using the token bucket algorithm. Rahul Verma owns this task, due by September 8th. (Status: Approved) Decision...",
+    "citations": [
+      "NLP Pipeline Design Session (2026-08-29) - 0:00",
+      "Redis Incident Post-Mortem (2026-09-03) - 0:00",
+      "Infrastructure Architecture Review (2026-08-27) - 0:00",
+      "Kickoff and Database Evaluation (2026-08-20) - 0:00",
+      "Database Decision Sync (2026-08-22) - 0:00",
+      "Deployment and Final Reconciliation (2026-08-24) - 0:00",
+      "Database Migration Planning (2026-08-22) - 0:00",
+      "Sprint Review \u2014 Week 3 (2026-08-25) - 0:00",
+      "Security and Compliance Review (2026-09-10) - 0:00"
+    ],
+    "latency_per_stage": {
+      "planner": 0.0004,
+      "temporal": 0.0203,
+      "graph": 0.0504,
+      "retrieval": 0.059,
+      "evidence": 0.0,
+      "answer": 0.0012
+    },
+    "insufficient_evidence": false
+  },
+  {
+    "question_id": "eq-07",
+    "category": "entity_lookup",
+    "query": "Who owns the Kubernetes cluster setup?",
+    "agents_invoked": [
+      "planner",
+      "graph",
+      "temporal",
+      "retrieval",
+      "evidence",
+      "answer"
+    ],
+    "execution_order": [
+      "planner",
+      "graph",
+      "temporal",
+      "retrieval",
+      "evidence",
+      "answer"
+    ],
+    "parallel_execution_groups": [
+      [
+        "retrieval",
+        "graph",
+        "temporal"
+      ]
+    ],
+    "evidence_collected": 7,
+    "confidence": 0.6788571428571428,
+    "final_answer": "According to the retrieved evidence: Decision: We decided to use Docker Compose for local development environments. The decision was made to avoid Kubernetes complexity at this stage. (Status: Approved) Decision: We need an API rate limi...",
+    "citations": [
+      "Sprint Review \u2014 Week 3 (2026-08-25) - 0:00",
+      "NLP Pipeline Design Session (2026-08-29) - 0:00",
+      "Redis Incident Post-Mortem (2026-09-03) - 0:00",
+      "Production Launch Planning (2026-09-08) - 0:00",
+      "Phase 10 Final Release Architecture and Retrospective (2026-09-18) - 0:45",
+      "Infrastructure Architecture Review (2026-08-27) - 0:18",
+      "Infrastructure Architecture Review (2026-08-27) - 0:00"
+    ],
+    "latency_per_stage": {
+      "planner": 0.0002,
+      "graph": 0.0066,
+      "temporal": 0.0145,
+      "retrieval": 0.0455,
+      "evidence": 0.0,
+      "answer": 0.0007
+    },
+    "insufficient_evidence": false
+  },
+  {
+    "question_id": "eq-08",
+    "category": "entity_lookup",
+    "query": "Who owns the Google Meet connector implementation?",
+    "agents_invoked": [
+      "planner",
+      "temporal",
+      "graph",
+      "retrieval",
+      "evidence",
+      "answer"
+    ],
+    "execution_order": [
+      "planner",
+      "temporal",
+      "graph",
+      "retrieval",
+      "evidence",
+      "answer"
+    ],
+    "parallel_execution_groups": [
+      [
+        "retrieval",
+        "graph",
+        "temporal"
+      ]
+    ],
+    "evidence_collected": 9,
+    "confidence": 0.7215666666666666,
+    "final_answer": "According to the retrieved evidence: Nisha Patel: The Google Meet connector is operational. Nisha Patel completed the Google Meet connector implementation on September 18th ahead of schedule. Decision: Let's finalize the database. We dec...",
+    "citations": [
+      "Phase 10 Final Release Architecture and Retrospective (2026-09-18) - 1:05",
+      "Database Decision Sync (2026-08-22) - 0:00",
+      "NLP Pipeline Design Session (2026-08-29) - 0:00",
+      "Redis Incident Post-Mortem (2026-09-03) - 0:00",
+      "Security and Compliance Review (2026-09-10) - 0:00",
+      "Cross-Team Integration Planning (2026-09-15) - 0:00",
+      "Kickoff and Database Evaluation (2026-08-20) - 0:00",
+      "Production Launch Planning (2026-09-08) - 0:00"
+    ],
+    "latency_per_stage": {
+      "planner": 0.0005,
+      "temporal": 0.0481,
+      "graph": 0.0535,
+      "retrieval": 0.0617,
+      "evidence": 0.0,
+      "answer": 0.0013
+    },
+    "insufficient_evidence": false
+  },
+  {
+    "question_id": "eq-09",
+    "category": "entity_lookup",
+    "query": "Who owns the JWT authentication and RBAC implementation?",
+    "agents_invoked": [
+      "planner",
+      "graph",
+      "temporal",
+      "retrieval",
+      "evidence",
+      "answer"
+    ],
+    "execution_order": [
+      "planner",
+      "graph",
+      "temporal",
+      "retrieval",
+      "evidence",
+      "answer"
+    ],
+    "parallel_execution_groups": [
+      [
+        "retrieval",
+        "graph",
+        "temporal"
+      ]
+    ],
+    "evidence_collected": 9,
+    "confidence": 0.8229444444444444,
+    "final_answer": "According to the retrieved evidence: Decision: We decided to implement JWT-based authentication for all API endpoints. Priya Sharma will own the auth module implementation. Deadline is September 18th. (Status: Approved) Decision: We deci...",
+    "citations": [
+      "Security and Compliance Review (2026-09-10) - 0:00",
+      "Cross-Team Integration Planning (2026-09-15) - 0:00",
+      "API Design and Versioning (2026-09-12) - 0:00"
+    ],
+    "latency_per_stage": {
+      "planner": 0.0004,
+      "graph": 0.016,
+      "temporal": 0.0235,
+      "retrieval": 0.0427,
+      "evidence": 0.0001,
+      "answer": 0.0012
+    },
+    "insufficient_evidence": false
+  },
+  {
+    "question_id": "eq-10",
+    "category": "decision_history",
+    "query": "Why did we adopt PostgreSQL instead of MongoDB?",
+    "agents_invoked": [
+      "planner",
+      "retrieval",
+      "temporal",
+      "graph",
+      "evidence",
+      "answer"
+    ],
+    "execution_order": [
+      "planner",
+      "retrieval",
+      "temporal",
+      "graph",
+      "evidence",
+      "answer"
+    ],
+    "parallel_execution_groups": [
+      [
+        "retrieval",
+        "graph",
+        "temporal"
+      ]
+    ],
+    "evidence_collected": 5,
+    "confidence": 0.85,
+    "final_answer": "Based on the meeting records, the team evaluated MongoDB and PostgreSQL, and decided to adopt PostgreSQL with pgvector as the official database.",
+    "citations": [
+      "Database Decision Sync (2026-08-22) - 0:00",
+      "Database Migration Planning (2026-08-22) - 0:00",
+      "Redis Incident Post-Mortem (2026-09-03) - 0:00",
+      "Production Launch Planning (2026-09-08) - 0:00",
+      "API Design and Versioning (2026-09-12) - 0:00"
+    ],
+    "latency_per_stage": {
+      "planner": 0.0005,
+      "retrieval": 0.0246,
+      "temporal": 0.0357,
+      "graph": 0.0496,
+      "evidence": 0.0,
+      "answer": 0.0004
+    },
+    "insufficient_evidence": false
+  },
+  {
+    "question_id": "eq-11",
+    "category": "decision_history",
+    "query": "What caching strategy was chosen for NLP processing to reduce latency?",
+    "agents_invoked": [
+      "planner",
+      "graph",
+      "temporal",
+      "retrieval",
+      "evidence",
+      "answer"
+    ],
+    "execution_order": [
+      "planner",
+      "graph",
+      "temporal",
+      "retrieval",
+      "evidence",
+      "answer"
+    ],
+    "parallel_execution_groups": [
+      [
+        "retrieval",
+        "graph",
+        "temporal"
+      ]
+    ],
+    "evidence_collected": 1,
+    "confidence": 0.85,
+    "final_answer": "According to the retrieved evidence: Decision: We decided to switch our NLP caching strategy from write-through to write-behind to reduce latency. This modifies the original Redis caching decision from the kickoff meeting. (Status: Appro...",
+    "citations": [
+      "Redis Incident Post-Mortem (2026-09-03) - 0:00"
+    ],
+    "latency_per_stage": {
+      "planner": 0.0002,
+      "graph": 0.0058,
+      "temporal": 0.01,
+      "retrieval": 0.0127,
+      "evidence": 0.0,
+      "answer": 0.0003
+    },
+    "insufficient_evidence": false
+  },
+  {
+    "question_id": "eq-12",
+    "category": "decision_history",
+    "query": "What is the standard vector embedding dimension size enforced in the pipeline?",
+    "agents_invoked": [
+      "planner",
+      "retrieval",
+      "evidence",
+      "answer"
+    ],
+    "execution_order": [
+      "planner",
+      "graph",
+      "temporal",
+      "retrieval",
+      "evidence",
+      "answer"
+    ],
+    "parallel_execution_groups": [
+      [
+        "retrieval",
+        "graph",
+        "temporal"
+      ]
+    ],
+    "evidence_collected": 7,
+    "confidence": 0.6200285714285715,
+    "final_answer": "According to the retrieved evidence: Nisha Patel: The pgvector dimension mismatch issue that Alex Rivera reported has been identified. The fix is to enforce 1536 dimensions as the standard embedding size across the pipeline. Decision: Le...",
+    "citations": [
+      "API Design and Versioning (2026-09-12) - 0:20",
+      "Database Decision Sync (2026-08-22) - 0:00",
+      "Production Launch Planning (2026-09-08) - 0:00",
+      "Security and Compliance Review (2026-09-10) - 0:00",
+      "Kickoff and Database Evaluation (2026-08-20) - 0:10",
+      "Phase 10 Final Release Architecture and Retrospective (2026-09-18) - 0:25",
+      "Production Launch Planning (2026-09-08) - 0:20"
+    ],
+    "latency_per_stage": {
+      "planner": 0.0005,
+      "graph": 0.0,
+      "temporal": 0.0,
+      "retrieval": 0.0269,
+      "evidence": 0.0,
+      "answer": 0.0002
+    },
+    "insufficient_evidence": false
+  },
+  {
+    "question_id": "eq-13",
+    "category": "decision_history",
+    "query": "What is the required retention period for data access audit logs?",
+    "agents_invoked": [
+      "planner",
+      "retrieval",
+      "evidence",
+      "answer"
+    ],
+    "execution_order": [
+      "planner",
+      "graph",
+      "temporal",
+      "retrieval",
+      "evidence",
+      "answer"
+    ],
+    "parallel_execution_groups": [
+      [
+        "retrieval",
+        "graph",
+        "temporal"
+      ]
+    ],
+    "evidence_collected": 11,
+    "confidence": 0.5374181818181818,
+    "final_answer": "According to the retrieved evidence: Decision: Let's finalize the database. We decided to adopt PostgreSQL for MeetingOS since pgvector fits our needs better than MongoDB. (Status: Reversed) Decision: We have decided to adopt PostgreSQL ...",
+    "citations": [
+      "Database Decision Sync (2026-08-22) - 0:00",
+      "Database Migration Planning (2026-08-22) - 0:00",
+      "Cross-Team Integration Planning (2026-09-15) - 0:00",
+      "Security and Compliance Review (2026-09-10) - 0:00",
+      "Security and Compliance Review (2026-09-10) - 0:42",
+      "Sprint Review \u2014 Week 3 (2026-08-25) - 0:00",
+      "Kickoff and Database Evaluation (2026-08-20) - 0:00",
+      "Deployment and Final Reconciliation (2026-08-24) - 0:10",
+      "NLP Pipeline Design Session (2026-08-29) - 0:20"
+    ],
+    "latency_per_stage": {
+      "planner": 0.0005,
+      "graph": 0.0,
+      "temporal": 0.0,
+      "retrieval": 0.0484,
+      "evidence": 0.0,
+      "answer": 0.0005
+    },
+    "insufficient_evidence": false
+  },
+  {
+    "question_id": "eq-14",
+    "category": "decision_history",
+    "query": "What prefix convention was agreed on for API routing?",
+    "agents_invoked": [
+      "planner",
+      "graph",
+      "temporal",
+      "retrieval",
+      "evidence",
+      "answer"
+    ],
+    "execution_order": [
+      "planner",
+      "graph",
+      "temporal",
+      "retrieval",
+      "evidence",
+      "answer"
+    ],
+    "parallel_execution_groups": [
+      [
+        "retrieval",
+        "graph",
+        "temporal"
+      ]
+    ],
+    "evidence_collected": 1,
+    "confidence": 0.85,
+    "final_answer": "According to the retrieved evidence: Decision: We decided to version the API under /api/v1 prefix. This is consistent with the REST versioning convention we agreed on in the kickoff. (Status: Approved)...",
+    "citations": [
+      "API Design and Versioning (2026-09-12) - 0:00"
+    ],
+    "latency_per_stage": {
+      "planner": 0.0004,
+      "graph": 0.0069,
+      "temporal": 0.015,
+      "retrieval": 0.0193,
+      "evidence": 0.0,
+      "answer": 0.0004
+    },
+    "insufficient_evidence": false
+  },
+  {
+    "question_id": "eq-15",
+    "category": "decision_reversal",
+    "query": "What was the initial orchestration choice and why was it reversed?",
+    "agents_invoked": [
+      "planner",
+      "retrieval",
+      "evidence",
+      "answer"
+    ],
+    "execution_order": [
+      "planner",
+      "graph",
+      "temporal",
+      "retrieval",
+      "evidence",
+      "answer"
+    ],
+    "parallel_execution_groups": [
+      [
+        "retrieval",
+        "graph",
+        "temporal"
+      ]
+    ],
+    "evidence_collected": 15,
+    "confidence": 0.6968066666666667,
+    "final_answer": "According to the retrieved evidence: Decision: We have decided to adopt PostgreSQL as our primary database. The decision is final and replaces the earlier MongoDB evaluation. (Status: Approved) Decision: Rahul Verma and Priya Sharma are ...",
+    "citations": [
+      "Database Migration Planning (2026-08-22) - 0:00",
+      "Cross-Team Integration Planning (2026-09-15) - 0:00",
+      "Infrastructure Architecture Review (2026-08-27) - 0:00",
+      "Security and Compliance Review (2026-09-10) - 0:00",
+      "Redis Incident Post-Mortem (2026-09-03) - 0:00",
+      "API Design and Versioning (2026-09-12) - 0:00",
+      "NLP Pipeline Design Session (2026-08-29) - 0:20",
+      "Deployment and Final Reconciliation (2026-08-24) - 0:10",
+      "Kickoff and Database Evaluation (2026-08-20) - 0:00",
+      "Production Launch Planning (2026-09-08) - 0:20"
+    ],
+    "latency_per_stage": {
+      "planner": 0.0005,
+      "graph": 0.0,
+      "temporal": 0.0,
+      "retrieval": 0.05,
+      "evidence": 0.0001,
+      "answer": 0.0007
+    },
+    "insufficient_evidence": false
+  },
+  {
+    "question_id": "eq-16",
+    "category": "decision_reversal",
+    "query": "Did the team stick with Docker Compose or migrate to Kubernetes for production?",
+    "agents_invoked": [
+      "planner",
+      "temporal",
+      "retrieval",
+      "graph",
+      "evidence",
+      "answer"
+    ],
+    "execution_order": [
+      "planner",
+      "temporal",
+      "retrieval",
+      "graph",
+      "evidence",
+      "answer"
+    ],
+    "parallel_execution_groups": [
+      [
+        "retrieval",
+        "graph",
+        "temporal"
+      ]
+    ],
+    "evidence_collected": 19,
+    "confidence": 0.8467157894736841,
+    "final_answer": "According to the retrieved evidence: Decision: Let's finalize the database. We decided to adopt PostgreSQL for MeetingOS since pgvector fits our needs better than MongoDB. (Status: Reversed) Decision: We decided to use Docker Compose for...",
+    "citations": [
+      "Database Decision Sync (2026-08-22) - 0:00",
+      "Sprint Review \u2014 Week 3 (2026-08-25) - 0:00",
+      "NLP Pipeline Design Session (2026-08-29) - 0:00",
+      "Redis Incident Post-Mortem (2026-09-03) - 0:00",
+      "Production Launch Planning (2026-09-08) - 0:00",
+      "Security and Compliance Review (2026-09-10) - 0:00",
+      "Cross-Team Integration Planning (2026-09-15) - 0:00",
+      "Database Migration Planning (2026-08-22) - 0:00",
+      "API Design and Versioning (2026-09-12) - 0:00",
+      "Infrastructure Architecture Review (2026-08-27) - 0:00"
+    ],
+    "latency_per_stage": {
+      "planner": 0.0005,
+      "temporal": 0.056,
+      "retrieval": 0.0679,
+      "graph": 0.068,
+      "evidence": 0.0,
+      "answer": 0.001
+    },
+    "insufficient_evidence": false
+  },
+  {
+    "question_id": "eq-17",
+    "category": "decision_reversal",
+    "query": "Which NLP library was replaced in favor of spaCy?",
+    "agents_invoked": [
+      "planner",
+      "graph",
+      "temporal",
+      "retrieval",
+      "evidence",
+      "answer"
+    ],
+    "execution_order": [
+      "planner",
+      "graph",
+      "temporal",
+      "retrieval",
+      "evidence",
+      "answer"
+    ],
+    "parallel_execution_groups": [
+      [
+        "retrieval",
+        "graph",
+        "temporal"
+      ]
+    ],
+    "evidence_collected": 12,
+    "confidence": 0.5776333333333333,
+    "final_answer": "According to the retrieved evidence: Decision: We decided to switch our NLP caching strategy from write-through to write-behind to reduce latency. This modifies the original Redis caching decision from the kickoff meeting. (Status: Appro...",
+    "citations": [
+      "Redis Incident Post-Mortem (2026-09-03) - 0:00",
+      "API Design and Versioning (2026-09-12) - 0:00",
+      "Sprint Review \u2014 Week 3 (2026-08-25) - 0:00",
+      "Production Launch Planning (2026-09-08) - 0:00",
+      "Cross-Team Integration Planning (2026-09-15) - 0:00",
+      "NLP Pipeline Design Session (2026-08-29) - 0:58",
+      "NLP Pipeline Design Session (2026-08-29) - 0:00",
+      "Production Launch Planning (2026-09-08) - 0:20",
+      "NLP Pipeline Design Session (2026-08-29) - 0:20",
+      "Phase 10 Final Release Architecture and Retrospective (2026-09-18) - 1:05"
+    ],
+    "latency_per_stage": {
+      "planner": 0.0003,
+      "graph": 0.0072,
+      "temporal": 0.0149,
+      "retrieval": 0.0491,
+      "evidence": 0.0,
+      "answer": 0.0004
+    },
+    "insufficient_evidence": false
+  },
+  {
+    "question_id": "eq-18",
+    "category": "commitment_ownership",
+    "query": "Who was assigned to the database schema migration task?",
+    "agents_invoked": [
+      "planner",
+      "temporal",
+      "retrieval",
+      "evidence",
+      "answer"
+    ],
+    "execution_order": [
+      "planner",
+      "graph",
+      "temporal",
+      "retrieval",
+      "evidence",
+      "answer"
+    ],
+    "parallel_execution_groups": [
+      [
+        "retrieval",
+        "graph",
+        "temporal"
+      ]
+    ],
+    "evidence_collected": 2,
+    "confidence": 0.85,
+    "final_answer": "Based on the meeting records, the team evaluated MongoDB and PostgreSQL, and decided to adopt PostgreSQL with pgvector as the official database.",
+    "citations": [
+      "Database Decision Sync (2026-08-22) - 0:00",
+      "Database Migration Planning (2026-08-22) - 0:00"
+    ],
+    "latency_per_stage": {
+      "planner": 0.0004,
+      "graph": 0.0,
+      "temporal": 0.0069,
+      "retrieval": 0.0121,
+      "evidence": 0.0,
+      "answer": 0.0005
+    },
+    "insufficient_evidence": false
+  },
+  {
+    "question_id": "eq-19",
+    "category": "commitment_ownership",
+    "query": "Who is responsible for the Redis rate limiter task?",
+    "agents_invoked": [
+      "planner",
+      "retrieval",
+      "temporal",
+      "graph",
+      "evidence",
+      "answer"
+    ],
+    "execution_order": [
+      "planner",
+      "retrieval",
+      "temporal",
+      "graph",
+      "evidence",
+      "answer"
+    ],
+    "parallel_execution_groups": [
+      [
+        "retrieval",
+        "graph",
+        "temporal"
+      ]
+    ],
+    "evidence_collected": 6,
+    "confidence": 0.85,
+    "final_answer": "According to the retrieved evidence: Action: Priya Sharma: I will own the database schema migration task. The deadline is set for next Friday, which is August 29th. (Owner: spk_priya, Status: In Progress) Action: Nisha Patel: I will own ...",
+    "citations": [
+      "Database Migration Planning (2026-08-22) - 0:00",
+      "Sprint Review \u2014 Week 3 (2026-08-25) - 0:00",
+      "Infrastructure Architecture Review (2026-08-27) - 0:00",
+      "API Design and Versioning (2026-09-12) - 0:00",
+      "Cross-Team Integration Planning (2026-09-15) - 0:00"
+    ],
+    "latency_per_stage": {
+      "planner": 0.0003,
+      "retrieval": 0.018,
+      "temporal": 0.0192,
+      "graph": 0.024,
+      "evidence": 0.0,
+      "answer": 0.0016
+    },
+    "insufficient_evidence": false
+  },
+  {
+    "question_id": "eq-20",
+    "category": "commitment_ownership",
+    "query": "Who was assigned to optimize Docker container image sizes?",
+    "agents_invoked": [
+      "planner",
+      "retrieval",
+      "temporal",
+      "graph",
+      "evidence",
+      "answer"
+    ],
+    "execution_order": [
+      "planner",
+      "retrieval",
+      "temporal",
+      "graph",
+      "evidence",
+      "answer"
+    ],
+    "parallel_execution_groups": [
+      [
+        "retrieval",
+        "graph",
+        "temporal"
+      ]
+    ],
+    "evidence_collected": 2,
+    "confidence": 0.85,
+    "final_answer": "According to the retrieved evidence: Action: Rahul Verma: The Redis timeout issue has recurred despite our connection pool fix. We are escalating this to a P1 incident. Alex Rivera is assigned to resolve it completely. (Owner: spk_resolv...",
+    "citations": [
+      "Infrastructure Architecture Review (2026-08-27) - 0:00",
+      "Redis Incident Post-Mortem (2026-09-03) - 0:00"
+    ],
+    "latency_per_stage": {
+      "planner": 0.0003,
+      "retrieval": 0.0135,
+      "temporal": 0.0144,
+      "graph": 0.0195,
+      "evidence": 0.0,
+      "answer": 0.0004
+    },
+    "insufficient_evidence": false
+  },
+  {
+    "question_id": "eq-21",
+    "category": "commitment_ownership",
+    "query": "Who committed to write the API integration test suite?",
+    "agents_invoked": [
+      "planner",
+      "graph",
+      "temporal",
+      "retrieval",
+      "evidence",
+      "answer"
+    ],
+    "execution_order": [
+      "planner",
+      "graph",
+      "temporal",
+      "retrieval",
+      "evidence",
+      "answer"
+    ],
+    "parallel_execution_groups": [
+      [
+        "retrieval",
+        "graph",
+        "temporal"
+      ]
+    ],
+    "evidence_collected": 1,
+    "confidence": 0.85,
+    "final_answer": "According to the retrieved evidence: Action: Kiran Das: I will write the API integration test suite covering all endpoints. The task is due by September 20th. (Owner: spk_kiran, Status: In Progress)...",
+    "citations": [
+      "API Design and Versioning (2026-09-12) - 0:00"
+    ],
+    "latency_per_stage": {
+      "planner": 0.0002,
+      "graph": 0.0061,
+      "temporal": 0.0113,
+      "retrieval": 0.0146,
+      "evidence": 0.0,
+      "answer": 0.0003
+    },
+    "insufficient_evidence": false
+  },
+  {
+    "question_id": "eq-22",
+    "category": "deadline_tracking",
+    "query": "What was the original deadline for the database schema migration?",
+    "agents_invoked": [
+      "planner",
+      "temporal",
+      "retrieval",
+      "evidence",
+      "answer"
+    ],
+    "execution_order": [
+      "planner",
+      "graph",
+      "temporal",
+      "retrieval",
+      "evidence",
+      "answer"
+    ],
+    "parallel_execution_groups": [
+      [
+        "retrieval",
+        "graph",
+        "temporal"
+      ]
+    ],
+    "evidence_collected": 2,
+    "confidence": 0.85,
+    "final_answer": "Based on the meeting records, the team evaluated MongoDB and PostgreSQL, and decided to adopt PostgreSQL with pgvector as the official database.",
+    "citations": [
+      "Database Decision Sync (2026-08-22) - 0:00",
+      "Database Migration Planning (2026-08-22) - 0:00"
+    ],
+    "latency_per_stage": {
+      "planner": 0.0002,
+      "graph": 0.0,
+      "temporal": 0.0058,
+      "retrieval": 0.0116,
+      "evidence": 0.0,
+      "answer": 0.0004
+    },
+    "insufficient_evidence": false
+  },
+  {
+    "question_id": "eq-23",
+    "category": "deadline_tracking",
+    "query": "To what date was the schema migration deadline moved?",
+    "agents_invoked": [
+      "planner",
+      "graph",
+      "temporal",
+      "retrieval",
+      "evidence",
+      "answer"
+    ],
+    "execution_order": [
+      "planner",
+      "graph",
+      "temporal",
+      "retrieval",
+      "evidence",
+      "answer"
+    ],
+    "parallel_execution_groups": [
+      [
+        "retrieval",
+        "graph",
+        "temporal"
+      ]
+    ],
+    "evidence_collected": 1,
+    "confidence": 0.0,
+    "final_answer": "The available meeting memory does not establish an answer to this question.",
+    "citations": [
+      "Database Migration Planning (2026-08-22) - 0:00"
+    ],
+    "latency_per_stage": {
+      "planner": 0.0005,
+      "graph": 0.0086,
+      "temporal": 0.0179,
+      "retrieval": 0.0218,
+      "evidence": 0.0,
+      "answer": 0.0
+    },
+    "insufficient_evidence": true
+  },
+  {
+    "question_id": "eq-24",
+    "category": "deadline_tracking",
+    "query": "When was the Kubernetes cluster setup deadline scheduled for?",
+    "agents_invoked": [
+      "planner",
+      "graph",
+      "retrieval",
+      "temporal",
+      "evidence",
+      "answer"
+    ],
+    "execution_order": [
+      "planner",
+      "graph",
+      "retrieval",
+      "temporal",
+      "evidence",
+      "answer"
+    ],
+    "parallel_execution_groups": [
+      [
+        "retrieval",
+        "graph",
+        "temporal"
+      ]
+    ],
+    "evidence_collected": 3,
+    "confidence": 0.0,
+    "final_answer": "The available meeting memory does not establish an answer to this question.",
+    "citations": [
+      "Database Migration Planning (2026-08-22) - 0:00",
+      "Infrastructure Architecture Review (2026-08-27) - 0:00",
+      "Redis Incident Post-Mortem (2026-09-03) - 0:00"
+    ],
+    "latency_per_stage": {
+      "planner": 0.0004,
+      "graph": 0.0069,
+      "retrieval": 0.0135,
+      "temporal": 0.013,
+      "evidence": 0.0,
+      "answer": 0.0
+    },
+    "insufficient_evidence": true
+  },
+  {
+    "question_id": "eq-25",
+    "category": "deadline_tracking",
+    "query": "What was the final extended deadline for the NLP pipeline integration?",
+    "agents_invoked": [
+      "planner",
+      "graph",
+      "retrieval",
+      "temporal",
+      "evidence",
+      "answer"
+    ],
+    "execution_order": [
+      "planner",
+      "graph",
+      "retrieval",
+      "temporal",
+      "evidence",
+      "answer"
+    ],
+    "parallel_execution_groups": [
+      [
+        "retrieval",
+        "graph",
+        "temporal"
+      ]
+    ],
+    "evidence_collected": 5,
+    "confidence": 0.85,
+    "final_answer": "According to the retrieved evidence: Action: Priya Sharma: I will own the database schema migration task. The deadline is set for next Friday, which is August 29th. (Owner: spk_priya, Status: In Progress) Action: Nisha Patel: I will own ...",
+    "citations": [
+      "Database Migration Planning (2026-08-22) - 0:00",
+      "Sprint Review \u2014 Week 3 (2026-08-25) - 0:00",
+      "Infrastructure Architecture Review (2026-08-27) - 0:00",
+      "Redis Incident Post-Mortem (2026-09-03) - 0:00",
+      "API Design and Versioning (2026-09-12) - 0:00"
+    ],
+    "latency_per_stage": {
+      "planner": 0.0003,
+      "graph": 0.0067,
+      "retrieval": 0.0131,
+      "temporal": 0.0122,
+      "evidence": 0.0,
+      "answer": 0.0003
+    },
+    "insufficient_evidence": false
+  },
+  {
+    "question_id": "eq-26",
+    "category": "issue_recurrence",
+    "query": "How many times did the Redis timeout issue recur across sprints?",
+    "agents_invoked": [
+      "planner",
+      "retrieval",
+      "temporal",
+      "graph",
+      "evidence",
+      "answer"
+    ],
+    "execution_order": [
+      "planner",
+      "retrieval",
+      "temporal",
+      "graph",
+      "evidence",
+      "answer"
+    ],
+    "parallel_execution_groups": [
+      [
+        "retrieval",
+        "graph",
+        "temporal"
+      ]
+    ],
+    "evidence_collected": 14,
+    "confidence": 0.85,
+    "final_answer": "According to the retrieved evidence: Issue: Alex Rivera: We have a timeout issue in Redis cache that is causing connection failures. (Status: Resolved) Issue: Alex Rivera: I am tracking the Redis timeout issue, but it is still ongoing. (...",
+    "citations": [
+      "Kickoff and Database Evaluation (2026-08-20) - 0:00",
+      "Database Decision Sync (2026-08-22) - 0:00",
+      "Deployment and Final Reconciliation (2026-08-24) - 0:00",
+      "Database Migration Planning (2026-08-22) - 0:00",
+      "Sprint Review \u2014 Week 3 (2026-08-25) - 0:00",
+      "Infrastructure Architecture Review (2026-08-27) - 0:00",
+      "Redis Incident Post-Mortem (2026-09-03) - 0:00",
+      "Production Launch Planning (2026-09-08) - 0:00",
+      "Security and Compliance Review (2026-09-10) - 0:00",
+      "API Design and Versioning (2026-09-12) - 0:00",
+      "Cross-Team Integration Planning (2026-09-15) - 0:00"
+    ],
+    "latency_per_stage": {
+      "planner": 0.0006,
+      "retrieval": 0.0172,
+      "temporal": 0.0171,
+      "graph": 0.0226,
+      "evidence": 0.0,
+      "answer": 0.0013
+    },
+    "insufficient_evidence": false
+  },
+  {
+    "question_id": "eq-27",
+    "category": "issue_recurrence",
+    "query": "Which authentication issue recurred twice during testing?",
+    "agents_invoked": [
+      "planner",
+      "temporal",
+      "retrieval",
+      "evidence",
+      "answer"
+    ],
+    "execution_order": [
+      "planner",
+      "graph",
+      "temporal",
+      "retrieval",
+      "evidence",
+      "answer"
+    ],
+    "parallel_execution_groups": [
+      [
+        "retrieval",
+        "graph",
+        "temporal"
+      ]
+    ],
+    "evidence_collected": 4,
+    "confidence": 0.85,
+    "final_answer": "According to the retrieved evidence: Issue: Alex Rivera: The pgvector extension for PostgreSQL has an open issue \u2014 embedding dimensions must match exactly. We encountered a dimension mismatch bug in staging and it caused a silent query f...",
+    "citations": [
+      "Security and Compliance Review (2026-09-10) - 0:00",
+      "API Design and Versioning (2026-09-12) - 0:00",
+      "Cross-Team Integration Planning (2026-09-15) - 0:00"
+    ],
+    "latency_per_stage": {
+      "planner": 0.0002,
+      "graph": 0.0,
+      "temporal": 0.0062,
+      "retrieval": 0.0128,
+      "evidence": 0.0,
+      "answer": 0.0004
+    },
+    "insufficient_evidence": false
+  },
+  {
+    "question_id": "eq-28",
+    "category": "issue_recurrence",
+    "query": "What recurring problem was observed with Kubernetes pod startup times?",
+    "agents_invoked": [
+      "planner",
+      "graph",
+      "retrieval",
+      "temporal",
+      "evidence",
+      "answer"
+    ],
+    "execution_order": [
+      "planner",
+      "graph",
+      "retrieval",
+      "temporal",
+      "evidence",
+      "answer"
+    ],
+    "parallel_execution_groups": [
+      [
+        "retrieval",
+        "graph",
+        "temporal"
+      ]
+    ],
+    "evidence_collected": 3,
+    "confidence": 0.85,
+    "final_answer": "According to the retrieved evidence: Issue: Kiran Das: The Kubernetes cluster is set up and the staging environment is running on it. However, we discovered a new issue: pod startup times are exceeding 30 seconds due to large Docker imag...",
+    "citations": [
+      "Redis Incident Post-Mortem (2026-09-03) - 0:00",
+      "Production Launch Planning (2026-09-08) - 0:00",
+      "API Design and Versioning (2026-09-12) - 0:00"
+    ],
+    "latency_per_stage": {
+      "planner": 0.0004,
+      "graph": 0.0138,
+      "retrieval": 0.0215,
+      "temporal": 0.0196,
+      "evidence": 0.0,
+      "answer": 0.0005
+    },
+    "insufficient_evidence": false
+  },
+  {
+    "question_id": "eq-29",
+    "category": "issue_resolution",
+    "query": "How was the Redis timeout issue finally resolved?",
+    "agents_invoked": [
+      "planner",
+      "retrieval",
+      "temporal",
+      "graph",
+      "evidence",
+      "answer"
+    ],
+    "execution_order": [
+      "planner",
+      "retrieval",
+      "temporal",
+      "graph",
+      "evidence",
+      "answer"
+    ],
+    "parallel_execution_groups": [
+      [
+        "retrieval",
+        "graph",
+        "temporal"
+      ]
+    ],
+    "evidence_collected": 14,
+    "confidence": 0.85,
+    "final_answer": "According to the retrieved evidence: Issue: Alex Rivera: We have a timeout issue in Redis cache that is causing connection failures. (Status: Resolved) Issue: Alex Rivera: I am tracking the Redis timeout issue, but it is still ongoing. (...",
+    "citations": [
+      "Kickoff and Database Evaluation (2026-08-20) - 0:00",
+      "Database Decision Sync (2026-08-22) - 0:00",
+      "Deployment and Final Reconciliation (2026-08-24) - 0:00",
+      "Database Migration Planning (2026-08-22) - 0:00",
+      "Sprint Review \u2014 Week 3 (2026-08-25) - 0:00",
+      "Infrastructure Architecture Review (2026-08-27) - 0:00",
+      "Redis Incident Post-Mortem (2026-09-03) - 0:00",
+      "Production Launch Planning (2026-09-08) - 0:00",
+      "Security and Compliance Review (2026-09-10) - 0:00",
+      "API Design and Versioning (2026-09-12) - 0:00",
+      "Cross-Team Integration Planning (2026-09-15) - 0:00"
+    ],
+    "latency_per_stage": {
+      "planner": 0.0006,
+      "retrieval": 0.0282,
+      "temporal": 0.0299,
+      "graph": 0.0369,
+      "evidence": 0.0,
+      "answer": 0.0018
+    },
+    "insufficient_evidence": false
+  },
+  {
+    "question_id": "eq-30",
+    "category": "issue_resolution",
+    "query": "How was the Kubernetes pod startup issue resolved?",
+    "agents_invoked": [
+      "planner",
+      "graph",
+      "retrieval",
+      "temporal",
+      "evidence",
+      "answer"
+    ],
+    "execution_order": [
+      "planner",
+      "graph",
+      "retrieval",
+      "temporal",
+      "evidence",
+      "answer"
+    ],
+    "parallel_execution_groups": [
+      [
+        "retrieval",
+        "graph",
+        "temporal"
+      ]
+    ],
+    "evidence_collected": 14,
+    "confidence": 0.85,
+    "final_answer": "According to the retrieved evidence: Issue: Alex Rivera: We have a timeout issue in Redis cache that is causing connection failures. (Status: Resolved) Issue: Alex Rivera: I am tracking the Redis timeout issue, but it is still ongoing. (...",
+    "citations": [
+      "Kickoff and Database Evaluation (2026-08-20) - 0:00",
+      "Database Decision Sync (2026-08-22) - 0:00",
+      "Deployment and Final Reconciliation (2026-08-24) - 0:00",
+      "Database Migration Planning (2026-08-22) - 0:00",
+      "Sprint Review \u2014 Week 3 (2026-08-25) - 0:00",
+      "Infrastructure Architecture Review (2026-08-27) - 0:00",
+      "Redis Incident Post-Mortem (2026-09-03) - 0:00",
+      "Production Launch Planning (2026-09-08) - 0:00",
+      "Security and Compliance Review (2026-09-10) - 0:00",
+      "API Design and Versioning (2026-09-12) - 0:00",
+      "Cross-Team Integration Planning (2026-09-15) - 0:00"
+    ],
+    "latency_per_stage": {
+      "planner": 0.0005,
+      "graph": 0.0082,
+      "retrieval": 0.0168,
+      "temporal": 0.0171,
+      "evidence": 0.0001,
+      "answer": 0.0009
+    },
+    "insufficient_evidence": false
+  },
+  {
+    "question_id": "eq-31",
+    "category": "issue_resolution",
+    "query": "What was the cause of the JWT token expiry bug and how was it fixed?",
+    "agents_invoked": [
+      "planner",
+      "graph",
+      "retrieval",
+      "temporal",
+      "evidence",
+      "answer"
+    ],
+    "execution_order": [
+      "planner",
+      "graph",
+      "retrieval",
+      "temporal",
+      "evidence",
+      "answer"
+    ],
+    "parallel_execution_groups": [
+      [
+        "retrieval",
+        "graph",
+        "temporal"
+      ]
+    ],
+    "evidence_collected": 9,
+    "confidence": 0.85,
+    "final_answer": "According to the retrieved evidence: Issue: Rahul Verma: Agreed. Rahul Verma will investigate the Redis timeout root cause and report by Tuesday. (Status: Recurring) Issue: Rahul Verma: I investigated the Redis timeout issue. The root ca...",
+    "citations": [
+      "Database Migration Planning (2026-08-22) - 0:00",
+      "Sprint Review \u2014 Week 3 (2026-08-25) - 0:00",
+      "Redis Incident Post-Mortem (2026-09-03) - 0:00",
+      "Production Launch Planning (2026-09-08) - 0:00",
+      "Security and Compliance Review (2026-09-10) - 0:00",
+      "API Design and Versioning (2026-09-12) - 0:00",
+      "Cross-Team Integration Planning (2026-09-15) - 0:00"
+    ],
+    "latency_per_stage": {
+      "planner": 0.0004,
+      "graph": 0.007,
+      "retrieval": 0.0136,
+      "temporal": 0.0129,
+      "evidence": 0.0,
+      "answer": 0.0007
+    },
+    "insufficient_evidence": false
+  },
+  {
+    "question_id": "eq-32",
+    "category": "temporal_reasoning",
+    "query": "On what date was the database schema migration completed and marked done?",
+    "agents_invoked": [
+      "planner",
+      "graph",
+      "temporal",
+      "retrieval",
+      "evidence",
+      "answer"
+    ],
+    "execution_order": [
+      "planner",
+      "graph",
+      "temporal",
+      "retrieval",
+      "evidence",
+      "answer"
+    ],
+    "parallel_execution_groups": [
+      [
+        "retrieval",
+        "graph",
+        "temporal"
+      ]
+    ],
+    "evidence_collected": 8,
+    "confidence": 0.7873625,
+    "final_answer": "Based on the meeting records, the team evaluated MongoDB and PostgreSQL, and decided to adopt PostgreSQL with pgvector as the official database.",
+    "citations": [
+      "Kickoff and Database Evaluation (2026-08-20) - 0:10",
+      "Database Decision Sync (2026-08-22) - 0:00",
+      "Database Migration Planning (2026-08-22) - 0:00",
+      "Kickoff and Database Evaluation (2026-08-20) - 0:00",
+      "Deployment and Final Reconciliation (2026-08-24) - 0:10"
+    ],
+    "latency_per_stage": {
+      "planner": 0.0002,
+      "graph": 0.0085,
+      "temporal": 0.0178,
+      "retrieval": 0.0394,
+      "evidence": 0.0,
+      "answer": 0.002
+    },
+    "insufficient_evidence": false
+  },
+  {
+    "question_id": "eq-33",
+    "category": "temporal_reasoning",
+    "query": "When was the Redis fix officially deployed?",
+    "agents_invoked": [
+      "planner",
+      "temporal",
+      "graph",
+      "retrieval",
+      "evidence",
+      "answer"
+    ],
+    "execution_order": [
+      "planner",
+      "temporal",
+      "graph",
+      "retrieval",
+      "evidence",
+      "answer"
+    ],
+    "parallel_execution_groups": [
+      [
+        "retrieval",
+        "graph",
+        "temporal"
+      ]
+    ],
+    "evidence_collected": 14,
+    "confidence": 0.85,
+    "final_answer": "According to the retrieved evidence: Decision: We need an API rate limiter. We decided to implement Redis-based rate limiting using the token bucket algorithm. Rahul Verma owns this task, due by September 8th. (Status: Approved) Decision...",
+    "citations": [
+      "NLP Pipeline Design Session (2026-08-29) - 0:00",
+      "Redis Incident Post-Mortem (2026-09-03) - 0:00",
+      "API Design and Versioning (2026-09-12) - 0:00",
+      "Infrastructure Architecture Review (2026-08-27) - 0:00",
+      "Kickoff and Database Evaluation (2026-08-20) - 0:00",
+      "Database Decision Sync (2026-08-22) - 0:00",
+      "Deployment and Final Reconciliation (2026-08-24) - 0:00",
+      "Database Migration Planning (2026-08-22) - 0:00",
+      "Sprint Review \u2014 Week 3 (2026-08-25) - 0:00",
+      "Cross-Team Integration Planning (2026-09-15) - 0:00"
+    ],
+    "latency_per_stage": {
+      "planner": 0.0005,
+      "temporal": 0.025,
+      "graph": 0.0598,
+      "retrieval": 0.07,
+      "evidence": 0.0,
+      "answer": 0.0016
+    },
+    "insufficient_evidence": false
+  },
+  {
+    "question_id": "eq-34",
+    "category": "temporal_reasoning",
+    "query": "Was the Google Meet connector finished before or after September 20th?",
+    "agents_invoked": [
+      "planner",
+      "temporal",
+      "retrieval",
+      "graph",
+      "evidence",
+      "answer"
+    ],
+    "execution_order": [
+      "planner",
+      "temporal",
+      "retrieval",
+      "graph",
+      "evidence",
+      "answer"
+    ],
+    "parallel_execution_groups": [
+      [
+        "retrieval",
+        "graph",
+        "temporal"
+      ]
+    ],
+    "evidence_collected": 19,
+    "confidence": 0.85,
+    "final_answer": "According to the retrieved evidence: Decision: Let's finalize the database. We decided to adopt PostgreSQL for MeetingOS since pgvector fits our needs better than MongoDB. (Status: Reversed) Decision: We decided to use Docker Compose for...",
+    "citations": [
+      "Database Decision Sync (2026-08-22) - 0:00",
+      "Sprint Review \u2014 Week 3 (2026-08-25) - 0:00",
+      "NLP Pipeline Design Session (2026-08-29) - 0:00",
+      "Redis Incident Post-Mortem (2026-09-03) - 0:00",
+      "Production Launch Planning (2026-09-08) - 0:00",
+      "Security and Compliance Review (2026-09-10) - 0:00",
+      "Cross-Team Integration Planning (2026-09-15) - 0:00",
+      "Database Migration Planning (2026-08-22) - 0:00",
+      "Infrastructure Architecture Review (2026-08-27) - 0:00",
+      "API Design and Versioning (2026-09-12) - 0:00"
+    ],
+    "latency_per_stage": {
+      "planner": 0.0006,
+      "temporal": 0.0738,
+      "retrieval": 0.082,
+      "graph": 0.0809,
+      "evidence": 0.0,
+      "answer": 0.0015
+    },
+    "insufficient_evidence": false
+  },
+  {
+    "question_id": "eq-35",
+    "category": "cross_meeting_reasoning",
+    "query": "Which meeting decisions influenced the adoption of pgvector in Meeting 9?",
+    "agents_invoked": [
+      "planner",
+      "retrieval",
+      "temporal",
+      "graph",
+      "evidence",
+      "answer"
+    ],
+    "execution_order": [
+      "planner",
+      "retrieval",
+      "temporal",
+      "graph",
+      "evidence",
+      "answer"
+    ],
+    "parallel_execution_groups": [
+      [
+        "retrieval",
+        "graph",
+        "temporal"
+      ]
+    ],
+    "evidence_collected": 10,
+    "confidence": 0.85,
+    "final_answer": "According to the retrieved evidence: Decision: Let's finalize the database. We decided to adopt PostgreSQL for MeetingOS since pgvector fits our needs better than MongoDB. (Status: Reversed) Decision: We have decided to adopt PostgreSQL ...",
+    "citations": [
+      "Database Decision Sync (2026-08-22) - 0:00",
+      "Database Migration Planning (2026-08-22) - 0:00",
+      "Sprint Review \u2014 Week 3 (2026-08-25) - 0:00",
+      "NLP Pipeline Design Session (2026-08-29) - 0:00",
+      "Redis Incident Post-Mortem (2026-09-03) - 0:00",
+      "Production Launch Planning (2026-09-08) - 0:00",
+      "Security and Compliance Review (2026-09-10) - 0:00",
+      "API Design and Versioning (2026-09-12) - 0:00",
+      "Cross-Team Integration Planning (2026-09-15) - 0:00"
+    ],
+    "latency_per_stage": {
+      "planner": 0.0004,
+      "retrieval": 0.0323,
+      "temporal": 0.0535,
+      "graph": 0.0602,
+      "evidence": 0.0,
+      "answer": 0.0009
+    },
+    "insufficient_evidence": false
+  },
+  {
+    "question_id": "eq-36",
+    "category": "cross_meeting_reasoning",
+    "query": "What connects the NLP entity extractor task to the spaCy adoption decision?",
+    "agents_invoked": [
+      "planner",
+      "graph",
+      "retrieval",
+      "temporal",
+      "evidence",
+      "answer"
+    ],
+    "execution_order": [
+      "planner",
+      "graph",
+      "retrieval",
+      "temporal",
+      "evidence",
+      "answer"
+    ],
+    "parallel_execution_groups": [
+      [
+        "retrieval",
+        "graph",
+        "temporal"
+      ]
+    ],
+    "evidence_collected": 10,
+    "confidence": 0.85,
+    "final_answer": "According to the retrieved evidence: Decision: Let's finalize the database. We decided to adopt PostgreSQL for MeetingOS since pgvector fits our needs better than MongoDB. (Status: Reversed) Decision: We have decided to adopt PostgreSQL ...",
+    "citations": [
+      "Database Decision Sync (2026-08-22) - 0:00",
+      "Database Migration Planning (2026-08-22) - 0:00",
+      "Sprint Review \u2014 Week 3 (2026-08-25) - 0:00",
+      "NLP Pipeline Design Session (2026-08-29) - 0:00",
+      "Redis Incident Post-Mortem (2026-09-03) - 0:00",
+      "Production Launch Planning (2026-09-08) - 0:00",
+      "Security and Compliance Review (2026-09-10) - 0:00",
+      "API Design and Versioning (2026-09-12) - 0:00",
+      "Cross-Team Integration Planning (2026-09-15) - 0:00"
+    ],
+    "latency_per_stage": {
+      "planner": 0.0003,
+      "graph": 0.0062,
+      "retrieval": 0.0117,
+      "temporal": 0.0115,
+      "evidence": 0.0,
+      "answer": 0.0005
+    },
+    "insufficient_evidence": false
+  },
+  {
+    "question_id": "eq-37",
+    "category": "graph_relationship",
+    "query": "Who worked across both Redis caching and rate limiting implementations?",
+    "agents_invoked": [
+      "planner",
+      "temporal",
+      "graph",
+      "retrieval",
+      "evidence",
+      "answer"
+    ],
+    "execution_order": [
+      "planner",
+      "temporal",
+      "graph",
+      "retrieval",
+      "evidence",
+      "answer"
+    ],
+    "parallel_execution_groups": [
+      [
+        "retrieval",
+        "graph",
+        "temporal"
+      ]
+    ],
+    "evidence_collected": 18,
+    "confidence": 0.85,
+    "final_answer": "According to the retrieved evidence: Decision: We have decided to adopt PostgreSQL as our primary database. The decision is final and replaces the earlier MongoDB evaluation. (Status: Approved) Decision: We need an API rate limiter. We d...",
+    "citations": [
+      "Database Migration Planning (2026-08-22) - 0:00",
+      "NLP Pipeline Design Session (2026-08-29) - 0:00",
+      "Redis Incident Post-Mortem (2026-09-03) - 0:00",
+      "Cross-Team Integration Planning (2026-09-15) - 0:00",
+      "Infrastructure Architecture Review (2026-08-27) - 0:00",
+      "Security and Compliance Review (2026-09-10) - 0:00",
+      "Kickoff and Database Evaluation (2026-08-20) - 0:00",
+      "Database Decision Sync (2026-08-22) - 0:00",
+      "Deployment and Final Reconciliation (2026-08-24) - 0:00",
+      "Sprint Review \u2014 Week 3 (2026-08-25) - 0:00",
+      "API Design and Versioning (2026-09-12) - 0:00"
+    ],
+    "latency_per_stage": {
+      "planner": 0.0002,
+      "temporal": 0.0198,
+      "graph": 0.0523,
+      "retrieval": 0.0659,
+      "evidence": 0.0,
+      "answer": 0.0014
+    },
+    "insufficient_evidence": false
+  },
+  {
+    "question_id": "eq-38",
+    "category": "graph_relationship",
+    "query": "Who are the joint owners of the data retention policy?",
+    "agents_invoked": [
+      "planner",
+      "retrieval",
+      "evidence",
+      "answer"
+    ],
+    "execution_order": [
+      "planner",
+      "graph",
+      "temporal",
+      "retrieval",
+      "evidence",
+      "answer"
+    ],
+    "parallel_execution_groups": [
+      [
+        "retrieval",
+        "graph",
+        "temporal"
+      ]
+    ],
+    "evidence_collected": 14,
+    "confidence": 0.77205,
+    "final_answer": "According to the retrieved evidence: Decision: Let's finalize the database. We decided to adopt PostgreSQL for MeetingOS since pgvector fits our needs better than MongoDB. (Status: Reversed) Decision: We have decided to adopt PostgreSQL ...",
+    "citations": [
+      "Database Decision Sync (2026-08-22) - 0:00",
+      "Database Migration Planning (2026-08-22) - 0:00",
+      "Redis Incident Post-Mortem (2026-09-03) - 0:00",
+      "API Design and Versioning (2026-09-12) - 0:00",
+      "Cross-Team Integration Planning (2026-09-15) - 0:00",
+      "Sprint Review \u2014 Week 3 (2026-08-25) - 0:00",
+      "Production Launch Planning (2026-09-08) - 0:00",
+      "Security and Compliance Review (2026-09-10) - 0:42",
+      "NLP Pipeline Design Session (2026-08-29) - 0:20"
+    ],
+    "latency_per_stage": {
+      "planner": 0.0006,
+      "graph": 0.0,
+      "temporal": 0.0,
+      "retrieval": 0.0489,
+      "evidence": 0.0,
+      "answer": 0.0006
+    },
+    "insufficient_evidence": false
+  },
+  {
+    "question_id": "eq-39",
+    "category": "insufficient_evidence",
+    "query": "What is the organization's plan for Apache Cassandra deployment?",
+    "agents_invoked": [
+      "planner",
+      "graph",
+      "temporal",
+      "retrieval",
+      "evidence",
+      "answer"
+    ],
+    "execution_order": [
+      "planner",
+      "graph",
+      "temporal",
+      "retrieval",
+      "evidence",
+      "answer"
+    ],
+    "parallel_execution_groups": [
+      [
+        "retrieval",
+        "graph",
+        "temporal"
+      ]
+    ],
+    "evidence_collected": 1,
+    "confidence": 0.0,
+    "final_answer": "The available meeting memory does not establish an answer to this question.",
+    "citations": [
+      "Phase 10 Final Release Architecture and Retrospective (2026-09-18) - 0:45"
+    ],
+    "latency_per_stage": {
+      "planner": 0.0004,
+      "graph": 0.017,
+      "temporal": 0.0464,
+      "retrieval": 0.0597,
+      "evidence": 0.0,
+      "answer": 0.0
+    },
+    "insufficient_evidence": true
+  },
+  {
+    "question_id": "eq-40",
+    "category": "insufficient_evidence",
+    "query": "Who was assigned to the Snowflake data warehouse integration?",
+    "agents_invoked": [
+      "planner",
+      "graph",
+      "retrieval",
+      "temporal",
+      "evidence",
+      "answer"
+    ],
+    "execution_order": [
+      "planner",
+      "graph",
+      "retrieval",
+      "temporal",
+      "evidence",
+      "answer"
+    ],
+    "parallel_execution_groups": [
+      [
+        "retrieval",
+        "graph",
+        "temporal"
+      ]
+    ],
+    "evidence_collected": 7,
+    "confidence": 0.0,
+    "final_answer": "The available meeting memory does not establish an answer to this question.",
+    "citations": [
+      "Database Decision Sync (2026-08-22) - 0:00",
+      "Database Migration Planning (2026-08-22) - 0:00",
+      "Sprint Review \u2014 Week 3 (2026-08-25) - 0:00",
+      "Infrastructure Architecture Review (2026-08-27) - 0:00",
+      "Redis Incident Post-Mortem (2026-09-03) - 0:00",
+      "API Design and Versioning (2026-09-12) - 0:00",
+      "Cross-Team Integration Planning (2026-09-15) - 0:00"
+    ],
+    "latency_per_stage": {
+      "planner": 0.0006,
+      "graph": 0.0072,
+      "retrieval": 0.0131,
+      "temporal": 0.0124,
+      "evidence": 0.0,
+      "answer": 0.0
+    },
+    "insufficient_evidence": true
+  },
+  {
+    "question_id": "eq-41",
+    "category": "insufficient_evidence",
+    "query": "What budget was approved for Amazon Web Services cloud infrastructure?",
+    "agents_invoked": [
+      "planner",
+      "graph",
+      "temporal",
+      "retrieval",
+      "evidence",
+      "answer"
+    ],
+    "execution_order": [
+      "planner",
+      "graph",
+      "temporal",
+      "retrieval",
+      "evidence",
+      "answer"
+    ],
+    "parallel_execution_groups": [
+      [
+        "retrieval",
+        "graph",
+        "temporal"
+      ]
+    ],
+    "evidence_collected": 0,
+    "confidence": 0.0,
+    "final_answer": "The available meeting memory does not establish an answer to this question.",
+    "citations": [],
+    "latency_per_stage": {
+      "planner": 0.0004,
+      "graph": 0.0178,
+      "temporal": 0.0235,
+      "retrieval": 0.0326,
+      "evidence": 0.0,
+      "answer": 0.0
+    },
+    "insufficient_evidence": true
+  },
+  {
+    "question_id": "eq-42",
+    "category": "insufficient_evidence",
+    "query": "When is the React Native mobile app scheduled for beta release?",
+    "agents_invoked": [
+      "planner",
+      "graph",
+      "temporal",
+      "retrieval",
+      "evidence",
+      "answer"
+    ],
+    "execution_order": [
+      "planner",
+      "graph",
+      "temporal",
+      "retrieval",
+      "evidence",
+      "answer"
+    ],
+    "parallel_execution_groups": [
+      [
+        "retrieval",
+        "graph",
+        "temporal"
+      ]
+    ],
+    "evidence_collected": 1,
+    "confidence": 0.0,
+    "final_answer": "The available meeting memory does not establish an answer to this question.",
+    "citations": [
+      "Phase 10 Final Release Architecture and Retrospective (2026-09-18) - 0:00"
+    ],
+    "latency_per_stage": {
+      "planner": 0.0003,
+      "graph": 0.0152,
+      "temporal": 0.0398,
+      "retrieval": 0.0494,
+      "evidence": 0.0,
+      "answer": 0.0
+    },
+    "insufficient_evidence": true
+  }
+]

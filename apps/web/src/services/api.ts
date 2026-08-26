@@ -240,6 +240,18 @@ export interface QueryResponse {
   reasoning_path: string[];
 }
 
+export interface AgentEvidence {
+  meeting_id: string;
+  meeting_title?: string;
+  meeting_date?: string;
+  segment_id: string;
+  start_time: number;
+  end_time: number;
+  source_type: string;
+  content: string;
+  relevance_score?: number;
+}
+
 export interface AgentTraceItem {
   agent: string;
   status: string;
@@ -253,7 +265,7 @@ export interface AgentTraceItem {
 export interface AgenticQueryResponse {
   answer: string;
   confidence: number;
-  evidence: EvidenceItem[];
+  evidence: AgentEvidence[];
   citations: string[];
   reasoning_summary: string;
   trace: AgentTraceItem[];

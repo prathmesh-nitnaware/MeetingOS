@@ -38,3 +38,27 @@ def load_mock_meetings() -> list[dict[str, Any]]:
         with filepath.open("r", encoding="utf-8") as f:
             meetings.append(json.load(f))
     return meetings
+
+
+def load_extended_dataset() -> list[LabeledQuestion]:
+    """Load the Phase 10 extended evaluation dataset (40+ questions)."""
+    dataset_path = get_datasets_dir() / "extended_dataset.json"
+    if not dataset_path.exists():
+        raise FileNotFoundError(f"Extended evaluation dataset not found at {dataset_path}")
+    with dataset_path.open("r", encoding="utf-8") as f:
+        items = json.load(f)
+    return [LabeledQuestion(**item) for item in items]
+
+
+def load_extended_meetings() -> list[dict[str, Any]]:
+    """Load all 13 evaluation meetings chronologically."""
+    meetings = []
+    datasets_dir = get_datasets_dir()
+    meeting_files = sorted(
+        datasets_dir.glob("meeting_*.json"),
+        key=lambda p: p.name,
+    )
+    for filepath in meeting_files:
+        with filepath.open("r", encoding="utf-8") as f:
+            meetings.append(json.load(f))
+    return meetings

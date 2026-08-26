@@ -1,0 +1,40 @@
+{
+  "meeting_id": "meet-eval-005",
+  "title": "Sprint Review — Week 3",
+  "meeting_date": "2026-08-25T14:00:00Z",
+  "source_type": "audio/wav",
+  "participants": [
+    {"id": "p-rahul-m5", "canonical_name": "Rahul Verma"},
+    {"id": "p-priya-m5", "canonical_name": "Priya Sharma"},
+    {"id": "p-alex-m5", "canonical_name": "Alex Rivera"},
+    {"id": "p-nisha-m5", "canonical_name": "Nisha Patel"}
+  ],
+  "speakers": [
+    {"speaker_id": "spk_rahul", "name": "Rahul Verma"},
+    {"speaker_id": "spk_priya", "name": "Priya Sharma"},
+    {"speaker_id": "spk_alex", "name": "Alex Rivera"},
+    {"speaker_id": "spk_nisha", "name": "Nisha Patel"}
+  ],
+  "segments": [
+    {
+      "segment_id": "seg-m5-01", "sequence": 0, "speaker_id": "spk_priya",
+      "start_time": 0.0, "end_time": 15.0,
+      "text": "Priya Sharma: The database schema migration deadline has been moved from August 29th to next Monday, September 1st due to the team being short-staffed this week."
+    },
+    {
+      "segment_id": "seg-m5-02", "sequence": 1, "speaker_id": "spk_rahul",
+      "start_time": 15.5, "end_time": 30.0,
+      "text": "Rahul Verma: I investigated the Redis timeout issue. The root cause is incorrect connection pool sizing. We are changing the max connections from 10 to 50."
+    },
+    {
+      "segment_id": "seg-m5-03", "sequence": 2, "speaker_id": "spk_alex",
+      "start_time": 30.5, "end_time": 48.0,
+      "text": "Alex Rivera: We decided to use Docker Compose for local development environments. The decision was made to avoid Kubernetes complexity at this stage."
+    },
+    {
+      "segment_id": "seg-m5-04", "sequence": 3, "speaker_id": "spk_nisha",
+      "start_time": 48.5, "end_time": 65.0,
+      "text": "Nisha Patel: I will own the NLP pipeline integration task. I commit to delivering the entity extractor prototype by end of sprint, which is September 5th."
+    }
+  ]
+}
