@@ -62,3 +62,13 @@ def load_extended_meetings() -> list[dict[str, Any]]:
         with filepath.open("r", encoding="utf-8") as f:
             meetings.append(json.load(f))
     return meetings
+
+
+def load_compositional_dataset() -> list[LabeledQuestion]:
+    """Load the Phase 11 compositional multi-meeting evaluation dataset (72+ questions)."""
+    dataset_path = get_datasets_dir() / "compositional_dataset.json"
+    if not dataset_path.exists():
+        raise FileNotFoundError(f"Compositional evaluation dataset not found at {dataset_path}")
+    with dataset_path.open("r", encoding="utf-8") as f:
+        items = json.load(f)
+    return [LabeledQuestion(**item) for item in items]

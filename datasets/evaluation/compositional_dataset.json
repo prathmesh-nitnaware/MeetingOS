@@ -1,0 +1,1051 @@
+[
+  {
+    "id": "eq-01",
+    "question": "Which database was adopted as the primary data store for MeetingOS?",
+    "expected_answer": "PostgreSQL",
+    "category": "factual_lookup",
+    "evidence_segments": [
+      "adopt PostgreSQL"
+    ],
+    "required_entities": [
+      "PostgreSQL"
+    ],
+    "type_filter": "decision"
+  },
+  {
+    "id": "eq-02",
+    "question": "What extension is used in PostgreSQL for vector similarity lookups?",
+    "expected_answer": "pgvector",
+    "category": "factual_lookup",
+    "evidence_segments": [
+      "PostgreSQL with pgvector"
+    ],
+    "required_entities": [
+      "pgvector",
+      "PostgreSQL"
+    ],
+    "type_filter": "decision"
+  },
+  {
+    "id": "eq-03",
+    "question": "What NLP backbone library was selected for entity extraction?",
+    "expected_answer": "spaCy",
+    "category": "factual_lookup",
+    "evidence_segments": [
+      "spaCy as our NLP backbone"
+    ],
+    "required_entities": [
+      "spaCy"
+    ],
+    "type_filter": "decision"
+  },
+  {
+    "id": "eq-04",
+    "question": "What authentication mechanism is used for API endpoints?",
+    "expected_answer": "JWT",
+    "category": "factual_lookup",
+    "evidence_segments": [
+      "JWT-based authentication"
+    ],
+    "required_entities": [
+      "JWT"
+    ],
+    "type_filter": "decision"
+  },
+  {
+    "id": "eq-05",
+    "question": "What algorithm is used for the Redis rate limiter?",
+    "expected_answer": "token bucket",
+    "category": "factual_lookup",
+    "evidence_segments": [
+      "token bucket algorithm"
+    ],
+    "required_entities": [
+      "Redis",
+      "token bucket"
+    ],
+    "type_filter": "decision"
+  },
+  {
+    "id": "eq-06",
+    "question": "Who investigated the Redis connection pool root cause?",
+    "expected_answer": "Rahul Verma",
+    "category": "entity_lookup",
+    "evidence_segments": [
+      "Rahul Verma",
+      "Redis timeout"
+    ],
+    "required_entities": [
+      "Rahul Verma",
+      "Redis"
+    ],
+    "type_filter": "action"
+  },
+  {
+    "id": "eq-07",
+    "question": "Who owns the Kubernetes cluster setup?",
+    "expected_answer": "Kiran Das",
+    "category": "entity_lookup",
+    "evidence_segments": [
+      "Kiran Das will own the Kubernetes cluster setup"
+    ],
+    "required_entities": [
+      "Kiran Das",
+      "Kubernetes"
+    ],
+    "type_filter": "action"
+  },
+  {
+    "id": "eq-08",
+    "question": "Who owns the Google Meet connector implementation?",
+    "expected_answer": "Nisha Patel",
+    "category": "entity_lookup",
+    "evidence_segments": [
+      "Nisha Patel will own the connector implementation"
+    ],
+    "required_entities": [
+      "Nisha Patel",
+      "Google Meet"
+    ],
+    "type_filter": "action"
+  },
+  {
+    "id": "eq-09",
+    "question": "Who owns the JWT authentication and RBAC implementation?",
+    "expected_answer": "Priya Sharma",
+    "category": "entity_lookup",
+    "evidence_segments": [
+      "Priya Sharma will own the auth module"
+    ],
+    "required_entities": [
+      "Priya Sharma",
+      "JWT"
+    ],
+    "type_filter": "action"
+  },
+  {
+    "id": "eq-10",
+    "question": "Why did we adopt PostgreSQL instead of MongoDB?",
+    "expected_answer": "PostgreSQL with pgvector supports vector embedding lookups",
+    "category": "decision_history",
+    "evidence_segments": [
+      "PostgreSQL with pgvector supports vector embedding lookups"
+    ],
+    "required_entities": [
+      "PostgreSQL",
+      "MongoDB"
+    ],
+    "type_filter": "decision"
+  },
+  {
+    "id": "eq-11",
+    "question": "What caching strategy was chosen for NLP processing to reduce latency?",
+    "expected_answer": "write-behind",
+    "category": "decision_history",
+    "evidence_segments": [
+      "write-behind"
+    ],
+    "required_entities": [
+      "NLP",
+      "caching"
+    ],
+    "type_filter": "decision"
+  },
+  {
+    "id": "eq-12",
+    "question": "What is the standard vector embedding dimension size enforced in the pipeline?",
+    "expected_answer": "1536",
+    "category": "decision_history",
+    "evidence_segments": [
+      "1536 dimensions"
+    ],
+    "required_entities": [
+      "pgvector",
+      "embedding"
+    ],
+    "type_filter": "decision"
+  },
+  {
+    "id": "eq-13",
+    "question": "What is the required retention period for data access audit logs?",
+    "expected_answer": "90 days",
+    "category": "decision_history",
+    "evidence_segments": [
+      "90 days minimum",
+      "retention"
+    ],
+    "required_entities": [
+      "audit",
+      "retention"
+    ],
+    "type_filter": "decision"
+  },
+  {
+    "id": "eq-14",
+    "question": "What prefix convention was agreed on for API routing?",
+    "expected_answer": "/api/v1",
+    "category": "decision_history",
+    "evidence_segments": [
+      "/api/v1 prefix"
+    ],
+    "required_entities": [
+      "API",
+      "prefix"
+    ],
+    "type_filter": "decision"
+  },
+  {
+    "id": "eq-15",
+    "question": "What was the initial orchestration choice and why was it reversed?",
+    "expected_answer": "Docker Compose",
+    "category": "decision_reversal",
+    "evidence_segments": [
+      "reversing the Docker Compose decision",
+      "migrate to Kubernetes"
+    ],
+    "required_entities": [
+      "Docker Compose",
+      "Kubernetes"
+    ],
+    "type_filter": "decision"
+  },
+  {
+    "id": "eq-16",
+    "question": "Did the team stick with Docker Compose or migrate to Kubernetes for production?",
+    "expected_answer": "Kubernetes",
+    "category": "decision_reversal",
+    "evidence_segments": [
+      "migrate to Kubernetes for production orchestration"
+    ],
+    "required_entities": [
+      "Kubernetes",
+      "Docker Compose"
+    ],
+    "type_filter": "decision"
+  },
+  {
+    "id": "eq-17",
+    "question": "Which NLP library was replaced in favor of spaCy?",
+    "expected_answer": "NLTK",
+    "category": "decision_reversal",
+    "evidence_segments": [
+      "replaces the earlier proposal to use NLTK"
+    ],
+    "required_entities": [
+      "spaCy",
+      "NLTK"
+    ],
+    "type_filter": "decision"
+  },
+  {
+    "id": "eq-18",
+    "question": "Who was assigned to the database schema migration task?",
+    "expected_answer": "Priya Sharma",
+    "category": "commitment_ownership",
+    "evidence_segments": [
+      "Priya Sharma",
+      "database schema migration"
+    ],
+    "required_entities": [
+      "Priya Sharma"
+    ],
+    "type_filter": "action"
+  },
+  {
+    "id": "eq-19",
+    "question": "Who is responsible for the Redis rate limiter task?",
+    "expected_answer": "Rahul Verma",
+    "category": "commitment_ownership",
+    "evidence_segments": [
+      "Rahul Verma owns this task",
+      "rate limiter"
+    ],
+    "required_entities": [
+      "Rahul Verma",
+      "rate limiter"
+    ],
+    "type_filter": "action"
+  },
+  {
+    "id": "eq-20",
+    "question": "Who was assigned to optimize Docker container image sizes?",
+    "expected_answer": "Kiran Das",
+    "category": "commitment_ownership",
+    "evidence_segments": [
+      "Kiran Das is assigned to optimize the Docker images"
+    ],
+    "required_entities": [
+      "Kiran Das",
+      "Docker"
+    ],
+    "type_filter": "action"
+  },
+  {
+    "id": "eq-21",
+    "question": "Who committed to write the API integration test suite?",
+    "expected_answer": "Kiran Das",
+    "category": "commitment_ownership",
+    "evidence_segments": [
+      "Kiran Das",
+      "API integration test suite"
+    ],
+    "required_entities": [
+      "Kiran Das"
+    ],
+    "type_filter": "action"
+  },
+  {
+    "id": "eq-22",
+    "question": "What was the original deadline for the database schema migration?",
+    "expected_answer": "August 29th",
+    "category": "deadline_tracking",
+    "evidence_segments": [
+      "August 29th"
+    ],
+    "required_entities": [
+      "August 29th",
+      "migration"
+    ],
+    "type_filter": "action"
+  },
+  {
+    "id": "eq-23",
+    "question": "To what date was the schema migration deadline moved?",
+    "expected_answer": "September 1st",
+    "category": "deadline_tracking",
+    "evidence_segments": [
+      "September 1st"
+    ],
+    "required_entities": [
+      "September 1st"
+    ],
+    "type_filter": "action"
+  },
+  {
+    "id": "eq-24",
+    "question": "When was the Kubernetes cluster setup deadline scheduled for?",
+    "expected_answer": "September 15th",
+    "category": "deadline_tracking",
+    "evidence_segments": [
+      "September 15th"
+    ],
+    "required_entities": [
+      "September 15th",
+      "Kubernetes"
+    ],
+    "type_filter": "action"
+  },
+  {
+    "id": "eq-25",
+    "question": "What was the final extended deadline for the NLP pipeline integration?",
+    "expected_answer": "September 10th",
+    "category": "deadline_tracking",
+    "evidence_segments": [
+      "September 10th"
+    ],
+    "required_entities": [
+      "September 10th",
+      "NLP"
+    ],
+    "type_filter": "action"
+  },
+  {
+    "id": "eq-26",
+    "question": "How many times did the Redis timeout issue recur across sprints?",
+    "expected_answer": "recurred",
+    "category": "issue_recurrence",
+    "evidence_segments": [
+      "Redis timeout issue has recurred"
+    ],
+    "required_entities": [
+      "Redis",
+      "timeout"
+    ],
+    "type_filter": "issue"
+  },
+  {
+    "id": "eq-27",
+    "question": "Which authentication issue recurred twice during testing?",
+    "expected_answer": "token expiry",
+    "category": "issue_recurrence",
+    "evidence_segments": [
+      "recurring authentication token expiry issue",
+      "occurred twice"
+    ],
+    "required_entities": [
+      "token expiry",
+      "authentication"
+    ],
+    "type_filter": "issue"
+  },
+  {
+    "id": "eq-28",
+    "question": "What recurring problem was observed with Kubernetes pod startup times?",
+    "expected_answer": "pod startup times",
+    "category": "issue_recurrence",
+    "evidence_segments": [
+      "pod startup times are exceeding 30 seconds"
+    ],
+    "required_entities": [
+      "pod startup",
+      "Kubernetes"
+    ],
+    "type_filter": "issue"
+  },
+  {
+    "id": "eq-29",
+    "question": "How was the Redis timeout issue finally resolved?",
+    "expected_answer": "circuit breaker",
+    "category": "issue_resolution",
+    "evidence_segments": [
+      "circuit breaker using the tenacity library"
+    ],
+    "required_entities": [
+      "circuit breaker",
+      "Redis"
+    ],
+    "type_filter": "issue"
+  },
+  {
+    "id": "eq-30",
+    "question": "How was the Kubernetes pod startup issue resolved?",
+    "expected_answer": "multi-stage builds",
+    "category": "issue_resolution",
+    "evidence_segments": [
+      "optimized Docker images",
+      "multi-stage builds"
+    ],
+    "required_entities": [
+      "multi-stage builds",
+      "Docker"
+    ],
+    "type_filter": "issue"
+  },
+  {
+    "id": "eq-31",
+    "question": "What was the cause of the JWT token expiry bug and how was it fixed?",
+    "expected_answer": "milliseconds",
+    "category": "issue_resolution",
+    "evidence_segments": [
+      "misconfigured as seconds instead of milliseconds"
+    ],
+    "required_entities": [
+      "milliseconds",
+      "JWT"
+    ],
+    "type_filter": "issue"
+  },
+  {
+    "id": "eq-32",
+    "question": "On what date was the database schema migration completed and marked done?",
+    "expected_answer": "August 29th",
+    "category": "temporal_reasoning",
+    "evidence_segments": [
+      "marked as done as of today, August 29th"
+    ],
+    "required_entities": [
+      "August 29th"
+    ],
+    "type_filter": "action"
+  },
+  {
+    "id": "eq-33",
+    "question": "When was the Redis fix officially deployed?",
+    "expected_answer": "September 3rd",
+    "category": "temporal_reasoning",
+    "evidence_segments": [
+      "deployed on September 3rd"
+    ],
+    "required_entities": [
+      "September 3rd",
+      "Redis"
+    ],
+    "type_filter": "issue"
+  },
+  {
+    "id": "eq-34",
+    "question": "Was the Google Meet connector finished before or after September 20th?",
+    "expected_answer": "September 18th",
+    "category": "temporal_reasoning",
+    "evidence_segments": [
+      "completed the Google Meet connector implementation on September 18th"
+    ],
+    "required_entities": [
+      "September 18th",
+      "Google Meet"
+    ],
+    "type_filter": "action"
+  },
+  {
+    "id": "eq-35",
+    "question": "Which meeting decisions influenced the adoption of pgvector in Meeting 9?",
+    "expected_answer": "PostgreSQL",
+    "category": "cross_meeting_reasoning",
+    "evidence_segments": [
+      "linked to the earlier PostgreSQL adoption decision"
+    ],
+    "required_entities": [
+      "PostgreSQL",
+      "pgvector"
+    ],
+    "type_filter": "decision"
+  },
+  {
+    "id": "eq-36",
+    "question": "What connects the NLP entity extractor task to the spaCy adoption decision?",
+    "expected_answer": "spaCy",
+    "category": "cross_meeting_reasoning",
+    "evidence_segments": [
+      "spaCy as our NLP backbone",
+      "entity extractor"
+    ],
+    "required_entities": [
+      "spaCy",
+      "NLP"
+    ],
+    "type_filter": "decision"
+  },
+  {
+    "id": "eq-37",
+    "question": "Who worked across both Redis caching and rate limiting implementations?",
+    "expected_answer": "Rahul Verma",
+    "category": "graph_relationship",
+    "evidence_segments": [
+      "Rahul Verma",
+      "Redis",
+      "rate limiting"
+    ],
+    "required_entities": [
+      "Rahul Verma",
+      "Redis"
+    ],
+    "type_filter": "action"
+  },
+  {
+    "id": "eq-38",
+    "question": "Who are the joint owners of the data retention policy?",
+    "expected_answer": "Rahul Verma and Priya Sharma",
+    "category": "graph_relationship",
+    "evidence_segments": [
+      "Rahul Verma and Priya Sharma are jointly responsible for the data retention policy"
+    ],
+    "required_entities": [
+      "Rahul Verma",
+      "Priya Sharma"
+    ],
+    "type_filter": "action"
+  },
+  {
+    "id": "eq-39",
+    "question": "What is the organization's plan for Apache Cassandra deployment?",
+    "expected_answer": "does not establish an answer",
+    "category": "insufficient_evidence",
+    "evidence_segments": [],
+    "required_entities": [
+      "Cassandra"
+    ],
+    "type_filter": "decision"
+  },
+  {
+    "id": "eq-40",
+    "question": "Who was assigned to the Snowflake data warehouse integration?",
+    "expected_answer": "does not establish an answer",
+    "category": "insufficient_evidence",
+    "evidence_segments": [],
+    "required_entities": [
+      "Snowflake"
+    ],
+    "type_filter": "action"
+  },
+  {
+    "id": "eq-41",
+    "question": "What budget was approved for Amazon Web Services cloud infrastructure?",
+    "expected_answer": "does not establish an answer",
+    "category": "insufficient_evidence",
+    "evidence_segments": [],
+    "required_entities": [
+      "Amazon Web Services",
+      "AWS"
+    ],
+    "type_filter": "decision"
+  },
+  {
+    "id": "eq-42",
+    "question": "When is the React Native mobile app scheduled for beta release?",
+    "expected_answer": "does not establish an answer",
+    "category": "insufficient_evidence",
+    "evidence_segments": [],
+    "required_entities": [
+      "React Native"
+    ],
+    "type_filter": "action"
+  },
+  {
+    "id": "cq-01",
+    "question": "Trace the chronological evolution of the database schema migration task from its initial assignment to its completion.",
+    "expected_answer": "Priya Sharma was assigned the schema migration with an initial August 29th deadline, which was moved to September 1st, and finally completed on August 29th.",
+    "category": "multi_meeting_timeline",
+    "evidence_segments": [
+      "Priya Sharma",
+      "August 29th",
+      "September 1st",
+      "marked as done as of today"
+    ],
+    "required_entities": [
+      "Priya Sharma",
+      "schema migration"
+    ],
+    "type_filter": "action"
+  },
+  {
+    "id": "cq-02",
+    "question": "What is the full lifecycle of the Redis timeout issue across all meetings?",
+    "expected_answer": "First reported in kickoff, investigated by Rahul Verma who changed connection pool to 50, recurred as a P1 incident assigned to Alex Rivera, and finally resolved with a circuit breaker using tenacity on September 3rd.",
+    "category": "multi_meeting_timeline",
+    "evidence_segments": [
+      "timeout issue in Redis cache",
+      "connection pool",
+      "escalating this to a P1",
+      "circuit breaker using the tenacity library"
+    ],
+    "required_entities": [
+      "Redis",
+      "Alex Rivera"
+    ],
+    "type_filter": "issue"
+  },
+  {
+    "id": "cq-03",
+    "question": "How did the container orchestration strategy evolve from local development to production?",
+    "expected_answer": "The team initially chose Docker Compose for local environments, then reversed the decision in Meeting 6 to migrate to Kubernetes for production, which Kiran Das deployed by September 15th.",
+    "category": "multi_meeting_timeline",
+    "evidence_segments": [
+      "Docker Compose for local development",
+      "reversing the Docker Compose decision",
+      "migrate to Kubernetes",
+      "Kubernetes cluster is set up"
+    ],
+    "required_entities": [
+      "Docker Compose",
+      "Kubernetes"
+    ],
+    "type_filter": "decision"
+  },
+  {
+    "id": "cq-04",
+    "question": "What was the progression of NLP pipeline decisions from design to delivery?",
+    "expected_answer": "Nisha Patel proposed spaCy over NLTK, extended the integration deadline to September 10th for coreference resolution, and closed the task on September 8th.",
+    "category": "multi_meeting_timeline",
+    "evidence_segments": [
+      "spaCy as our NLP backbone",
+      "extended from September 5th to September 10th",
+      "NLP pipeline is complete"
+    ],
+    "required_entities": [
+      "spaCy",
+      "Nisha Patel"
+    ],
+    "type_filter": "decision"
+  },
+  {
+    "id": "cq-05",
+    "question": "What is the timeline of authentication security decisions and implementations?",
+    "expected_answer": "Alex Rivera decided on JWT in Meeting 10 with Priya Sharma owning auth and RBAC (admin, member, viewer), and Priya completed the module in Meeting 12.",
+    "category": "multi_meeting_timeline",
+    "evidence_segments": [
+      "JWT-based authentication",
+      "admin, member, and viewer",
+      "JWT authentication module is complete"
+    ],
+    "required_entities": [
+      "JWT",
+      "Priya Sharma"
+    ],
+    "type_filter": "decision"
+  },
+  {
+    "id": "cq-06",
+    "question": "Why was the caching strategy modified from write-through to write-behind?",
+    "expected_answer": "Rahul Verma decided to switch NLP caching strategy to write-behind to reduce latency.",
+    "category": "decision_modification",
+    "evidence_segments": [
+      "switch our NLP caching strategy from write-through to write-behind to reduce latency"
+    ],
+    "required_entities": [
+      "write-behind",
+      "caching"
+    ],
+    "type_filter": "decision"
+  },
+  {
+    "id": "cq-07",
+    "question": "What initial proposal was superseded when spaCy was adopted for NLP entity extraction?",
+    "expected_answer": "NLTK",
+    "category": "decision_modification",
+    "evidence_segments": [
+      "replaces the earlier proposal to use NLTK"
+    ],
+    "required_entities": [
+      "NLTK",
+      "spaCy"
+    ],
+    "type_filter": "decision"
+  },
+  {
+    "id": "cq-08",
+    "question": "Which orchestration platform was rejected after benchmarking showed Docker Compose was insufficient?",
+    "expected_answer": "Docker Compose",
+    "category": "decision_reversal",
+    "evidence_segments": [
+      "reversing the Docker Compose decision",
+      "migrate to Kubernetes"
+    ],
+    "required_entities": [
+      "Docker Compose",
+      "Kubernetes"
+    ],
+    "type_filter": "decision"
+  },
+  {
+    "id": "cq-09",
+    "question": "How did the team resolve the conflict between MongoDB's flexibility and PostgreSQL's capabilities?",
+    "expected_answer": "The team adopted PostgreSQL with pgvector for native vector embeddings.",
+    "category": "decision_modification",
+    "evidence_segments": [
+      "PostgreSQL with pgvector supports vector embedding lookups"
+    ],
+    "required_entities": [
+      "PostgreSQL",
+      "MongoDB"
+    ],
+    "type_filter": "decision"
+  },
+  {
+    "id": "cq-10",
+    "question": "What changed between Meeting 5 and Meeting 6 regarding the production deployment infrastructure?",
+    "expected_answer": "Meeting 5 used Docker Compose to avoid complexity, but Meeting 6 reversed this to migrate to Kubernetes.",
+    "category": "decision_reversal",
+    "evidence_segments": [
+      "use Docker Compose",
+      "migrate to Kubernetes for production orchestration"
+    ],
+    "required_entities": [
+      "Docker Compose",
+      "Kubernetes"
+    ],
+    "type_filter": "decision"
+  },
+  {
+    "id": "cq-11",
+    "question": "Who was assigned to the Redis issue after it recurred as a P1 incident?",
+    "expected_answer": "Alex Rivera",
+    "category": "commitment_ownership",
+    "evidence_segments": [
+      "Alex Rivera is assigned to resolve it completely"
+    ],
+    "required_entities": [
+      "Alex Rivera",
+      "Redis"
+    ],
+    "type_filter": "action"
+  },
+  {
+    "id": "cq-12",
+    "question": "Who owned the Docker image size optimization task for Kubernetes pods?",
+    "expected_answer": "Kiran Das",
+    "category": "commitment_ownership",
+    "evidence_segments": [
+      "Kiran Das is assigned to optimize the Docker images"
+    ],
+    "required_entities": [
+      "Kiran Das",
+      "Docker"
+    ],
+    "type_filter": "action"
+  },
+  {
+    "id": "cq-13",
+    "question": "Which team member was tasked with writing the API integration test suite?",
+    "expected_answer": "Kiran Das",
+    "category": "commitment_ownership",
+    "evidence_segments": [
+      "Kiran Das",
+      "API integration test suite"
+    ],
+    "required_entities": [
+      "Kiran Das"
+    ],
+    "type_filter": "action"
+  },
+  {
+    "id": "cq-14",
+    "question": "Who was responsible for implementing the Google Meet integration connector?",
+    "expected_answer": "Nisha Patel",
+    "category": "commitment_ownership",
+    "evidence_segments": [
+      "Nisha Patel will own the connector implementation"
+    ],
+    "required_entities": [
+      "Nisha Patel",
+      "Google Meet"
+    ],
+    "type_filter": "action"
+  },
+  {
+    "id": "cq-15",
+    "question": "Why was the database schema migration deadline delayed from August 29th to September 1st?",
+    "expected_answer": "due to the team being short-staffed this week",
+    "category": "deadline_change_history",
+    "evidence_segments": [
+      "short-staffed this week",
+      "September 1st"
+    ],
+    "required_entities": [
+      "September 1st",
+      "short-staffed"
+    ],
+    "type_filter": "action"
+  },
+  {
+    "id": "cq-16",
+    "question": "Why did Nisha Patel extend her NLP pipeline integration deadline to September 10th?",
+    "expected_answer": "added a co-reference resolution module to the scope",
+    "category": "deadline_change_history",
+    "evidence_segments": [
+      "added a co-reference resolution module to the scope"
+    ],
+    "required_entities": [
+      "co-reference resolution",
+      "September 10th"
+    ],
+    "type_filter": "action"
+  },
+  {
+    "id": "cq-17",
+    "question": "What was the final completion target date for the Kubernetes cluster setup?",
+    "expected_answer": "September 15th",
+    "category": "deadline_change_history",
+    "evidence_segments": [
+      "target completion date is September 15th"
+    ],
+    "required_entities": [
+      "September 15th",
+      "Kubernetes"
+    ],
+    "type_filter": "action"
+  },
+  {
+    "id": "cq-18",
+    "question": "When was the Redis circuit breaker fix scheduled to be delivered by Alex Rivera?",
+    "expected_answer": "September 3rd",
+    "category": "deadline_change_history",
+    "evidence_segments": [
+      "Deadline: September 3rd"
+    ],
+    "required_entities": [
+      "September 3rd",
+      "Alex Rivera"
+    ],
+    "type_filter": "action"
+  },
+  {
+    "id": "cq-19",
+    "question": "Which two infrastructure issues were caused by configuration errors rather than code bugs?",
+    "expected_answer": "Redis connection pool sizing and JWT token expiry seconds vs milliseconds",
+    "category": "recurring_issue_analysis",
+    "evidence_segments": [
+      "connection pool sizing",
+      "seconds instead of milliseconds"
+    ],
+    "required_entities": [
+      "Redis",
+      "JWT"
+    ],
+    "type_filter": "issue"
+  },
+  {
+    "id": "cq-20",
+    "question": "What caused Kubernetes pod startup times to exceed 30 seconds and how was it solved?",
+    "expected_answer": "large Docker images reduced from 1.2GB to 450MB using multi-stage builds",
+    "category": "issue_resolution",
+    "evidence_segments": [
+      "pod startup times are exceeding 30 seconds",
+      "multi-stage builds"
+    ],
+    "required_entities": [
+      "multi-stage builds",
+      "Docker"
+    ],
+    "type_filter": "issue"
+  },
+  {
+    "id": "cq-21",
+    "question": "What silent query failure was discovered during pgvector staging testing?",
+    "expected_answer": "dimension mismatch",
+    "category": "recurring_issue_analysis",
+    "evidence_segments": [
+      "embedding dimensions must match exactly",
+      "dimension mismatch bug"
+    ],
+    "required_entities": [
+      "pgvector",
+      "dimension mismatch"
+    ],
+    "type_filter": "issue"
+  },
+  {
+    "id": "cq-22",
+    "question": "How did the team resolve the pgvector dimension mismatch issue?",
+    "expected_answer": "enforce 1536 dimensions as the standard embedding size",
+    "category": "issue_resolution",
+    "evidence_segments": [
+      "enforce 1536 dimensions as the standard embedding size"
+    ],
+    "required_entities": [
+      "1536 dimensions",
+      "pgvector"
+    ],
+    "type_filter": "issue"
+  },
+  {
+    "id": "cq-23",
+    "question": "How did the PostgreSQL decision in Meeting 4 enable the pgvector decision in Meeting 9?",
+    "expected_answer": "pgvector is an extension for PostgreSQL vector similarity search",
+    "category": "cross_meeting_causality",
+    "evidence_segments": [
+      "pgvector extension for vector similarity search in PostgreSQL",
+      "linked to the earlier PostgreSQL adoption decision"
+    ],
+    "required_entities": [
+      "PostgreSQL",
+      "pgvector"
+    ],
+    "type_filter": "decision"
+  },
+  {
+    "id": "cq-24",
+    "question": "What shared responsibility exists between Rahul Verma and Priya Sharma across meetings?",
+    "expected_answer": "data retention policy with 90-day retention window",
+    "category": "graph_relationship",
+    "evidence_segments": [
+      "Rahul Verma and Priya Sharma are jointly responsible for the data retention policy",
+      "90-day retention window"
+    ],
+    "required_entities": [
+      "Rahul Verma",
+      "Priya Sharma"
+    ],
+    "type_filter": "action"
+  },
+  {
+    "id": "cq-25",
+    "question": "Which technologies are associated with Alex Rivera's commitments?",
+    "expected_answer": "Redis circuit breaker and Docker Compose benchmarking",
+    "category": "graph_relationship",
+    "evidence_segments": [
+      "Alex Rivera",
+      "Redis",
+      "Docker Compose"
+    ],
+    "required_entities": [
+      "Alex Rivera",
+      "Redis"
+    ],
+    "type_filter": "action"
+  },
+  {
+    "id": "cq-26",
+    "question": "Which projects or modules did Nisha Patel deliver across all sprints?",
+    "expected_answer": "NLP pipeline with spaCy and Google Meet connector",
+    "category": "graph_relationship",
+    "evidence_segments": [
+      "Nisha Patel",
+      "NLP pipeline",
+      "Google Meet connector"
+    ],
+    "required_entities": [
+      "Nisha Patel",
+      "spaCy"
+    ],
+    "type_filter": "action"
+  },
+  {
+    "id": "cq-27",
+    "question": "What was decided regarding the migration to AWS DynamoDB in the architecture review?",
+    "expected_answer": "does not establish an answer",
+    "category": "insufficient_evidence",
+    "evidence_segments": [],
+    "required_entities": [
+      "DynamoDB"
+    ],
+    "type_filter": "decision"
+  },
+  {
+    "id": "cq-28",
+    "question": "Who was appointed as the security officer for SOC2 compliance certification?",
+    "expected_answer": "does not establish an answer",
+    "category": "insufficient_evidence",
+    "evidence_segments": [],
+    "required_entities": [
+      "SOC2"
+    ],
+    "type_filter": "action"
+  },
+  {
+    "id": "cq-29",
+    "question": "What is the monthly budget allocated for Google Cloud Platform GPU instances?",
+    "expected_answer": "does not establish an answer",
+    "category": "insufficient_evidence",
+    "evidence_segments": [],
+    "required_entities": [
+      "Google Cloud Platform",
+      "GPU"
+    ],
+    "type_filter": "decision"
+  },
+  {
+    "id": "cq-30",
+    "question": "When is the Elasticsearch full-text search cluster scheduled to go live?",
+    "expected_answer": "does not establish an answer",
+    "category": "insufficient_evidence",
+    "evidence_segments": [],
+    "required_entities": [
+      "Elasticsearch"
+    ],
+    "type_filter": "action"
+  },
+  {
+    "id": "cq-31",
+    "question": "What was decided about migrating our backend from FastAPI to Django?",
+    "expected_answer": "does not establish an answer",
+    "category": "insufficient_evidence",
+    "evidence_segments": [],
+    "required_entities": [
+      "Django"
+    ],
+    "type_filter": "decision"
+  },
+  {
+    "id": "cq-32",
+    "question": "Who is responsible for the Android mobile application release?",
+    "expected_answer": "does not establish an answer",
+    "category": "insufficient_evidence",
+    "evidence_segments": [],
+    "required_entities": [
+      "Android"
+    ],
+    "type_filter": "action"
+  },
+  {
+    "id": "cq-33",
+    "question": "What agreement was reached regarding Apache Kafka event streaming?",
+    "expected_answer": "does not establish an answer",
+    "category": "insufficient_evidence",
+    "evidence_segments": [],
+    "required_entities": [
+      "Apache Kafka",
+      "Kafka"
+    ],
+    "type_filter": "decision"
+  }
+]

@@ -34,7 +34,10 @@ class Settings(BaseSettings):
     diarizer_provider: str = "mock"
     ner_provider: str = "mock"
     classifier_provider: str = "mock"
-    reasoner_provider: str = "mock"
+    embedding_provider: str = Field(default="mock", alias="MEETINGOS_EMBEDDING_PROVIDER")
+    embedding_model: str = Field(default="local-semantic-v1", alias="MEETINGOS_EMBEDDING_MODEL")
+    reasoner_provider: str = Field(default="mock", alias="MEETINGOS_REASONER_PROVIDER")
+    reasoner_model: str = Field(default="local-reasoner-v1", alias="MEETINGOS_REASONER_MODEL")
 
     # Connector Configuration
     teams_enabled: bool = False
