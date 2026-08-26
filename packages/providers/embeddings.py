@@ -110,9 +110,9 @@ class SentenceTransformerEmbedder(BaseEmbedder):
     def _get_model(self) -> Any:
         if self._model is None:
             try:
-                from sentence_transformers import SentenceTransformer  # pyright: ignore[reportMissingImports]
+                import sentence_transformers  # pyright: ignore[reportMissingImports]
 
-                self._model = SentenceTransformer(self.model_name)
+                self._model = sentence_transformers.SentenceTransformer(self.model_name)
             except ImportError:
                 # Fallback to LocalSemanticEmbedder
                 self._model = LocalSemanticEmbedder(dimension=384, model_name=self.model_name)

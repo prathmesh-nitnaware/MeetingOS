@@ -1,5 +1,32 @@
-from pydantic import Field
+import logging
+import sys
+from typing import Literal
+
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+logger = logging.getLogger("meetingos.config")
+
+VALID_EMBEDDING_PROVIDERS = {
+    "mock",
+    "real",
+    "local",
+    "local_semantic",
+    "sentence_transformers",
+    "st",
+    "openai",
+    "openai_compatible",
+}
+
+VALID_REASONER_PROVIDERS = {
+    "mock",
+    "real",
+    "local",
+    "local_evidence",
+    "openai",
+    "openai_compatible",
+    "llm",
+}
 
 
 class Settings(BaseSettings):
@@ -9,11 +36,13 @@ class Settings(BaseSettings):
         env_file=".env",
         env_file_encoding="utf-8",
         extra="ignore",
+        populate_by_name=True,
     )
 
+    # Core Application
     app_name: str = "MeetingOS API"
     app_version: str = "0.1.0"
-    app_env: str = "development"
+    app_env: Literal["development", "test", "staging", "production"] = "development"
     app_debug: bool = True
     api_v1_prefix: str = "/api/v1"
 
@@ -27,7 +56,7 @@ class Settings(BaseSettings):
 
     # Storage & Uploads
     upload_storage_dir: str = Field(default="./data/uploads")
-    max_upload_size_mb: int = Field(default=500)
+    max_upload_size_mb: int = Field(default=500, gt=0)
 
     # Speech / ML Providers
     asr_provider: str = "mock"
@@ -58,5 +87,83 @@ class Settings(BaseSettings):
     google_client_id: str | None = None
     google_client_secret: str | None = None
 
+    @model_validator(mode="after")
+    def validate_provider_and_environment(self) -> "Settings":
+        # Validate provider selections
+        emb = self.embedding_provider.lower()
+        if emb not in VALID_EMBEDDING_PROVIDERS:
+            raise ValueError(
+                f"Invalid MEETINGOS_EMBEDDING_PROVIDER: '{self.embedding_provider}'. "
+                f"Allowed: {sorted(VALID_EMBEDDING_PROVIDERS)}"
+            )
+
+        reas = self.reasoner_provider.lower()
+        if reas not in VALID_REASONER_PROVIDERS:
+            raise ValueError(
+                f"Invalid MEETINGOS_REASONER_PROVIDER: '{self.reasoner_provider}'. "
+                f"Allowed: {sorted(VALID_REASONER_PROVIDERS)}"
+            )
+
+        # Validate production environment security constraints
+        if self.app_env == "production":
+            if "meetingos_secret_password" in self.database_url:
+                raise ValueError(
+                    "Production configuration error: default insecure database password detected."
+                )
+            if self.app_debug:
+                raise ValueError(
+                    "Production configuration error: app_debug must be False in production."
+                )
+            if emb in ("openai", "openai_compatible") and not self.embedding_api_key:
+                raise ValueError(
+                    "Production configuration error: OpenAI embedding provider configured without MEETINGOS_EMBEDDING_API_KEY."
+                )
+            if reas in ("openai", "openai_compatible", "llm") and not self.reasoner_api_key:
+                raise ValueError(
+                    "Production configuration error: OpenAI reasoner provider configured without MEETINGOS_REASONER_API_KEY."
+                )
+            if self.teams_enabled and (not self.teams_client_id or not self.teams_client_secret):
+                raise ValueError(
+                    "Production configuration error: Teams connector enabled without credentials."
+                )
+            if self.zoom_enabled and (not self.zoom_client_id or not self.zoom_client_secret):
+                raise ValueError(
+                    "Production configuration error: Zoom connector enabled without credentials."
+                )
+            if self.google_meet_enabled and (
+                not self.google_client_id or not self.google_client_secret
+            ):
+                raise ValueError(
+                    "Production configuration error: Google Meet connector enabled without credentials."
+                )
+
+        return self
+
 
 settings = Settings()
+
+
+def validate_config() -> int:
+    """CLI helper to validate the active configuration."""
+    try:
+        current_settings = Settings()
+        print(f"[OK] Configuration valid for environment: '{current_settings.app_env}'")
+        print(f"     App Version: {current_settings.app_version}")
+        print(
+            f"     Embedding Provider: {current_settings.embedding_provider} ({current_settings.embedding_model})"
+        )
+        print(
+            f"     Reasoner Provider: {current_settings.reasoner_provider} ({current_settings.reasoner_model})"
+        )
+        print(
+            f"     Database URL: {current_settings.database_url.split('@')[-1] if '@' in current_settings.database_url else 'configured'}"
+        )
+        print(f"     Redis URL: {current_settings.redis_url}")
+        return 0
+    except Exception as exc:
+        print(f"[ERROR] Configuration validation failed: {exc}", file=sys.stderr)
+        return 1
+
+
+if __name__ == "__main__":
+    sys.exit(validate_config())
