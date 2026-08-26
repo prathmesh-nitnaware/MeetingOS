@@ -16,6 +16,8 @@ VALID_EMBEDDING_PROVIDERS = {
     "st",
     "openai",
     "openai_compatible",
+    "gemini",
+    "google",
 }
 
 VALID_REASONER_PROVIDERS = {
@@ -26,6 +28,10 @@ VALID_REASONER_PROVIDERS = {
     "openai",
     "openai_compatible",
     "llm",
+    "anthropic",
+    "claude",
+    "gemini",
+    "google",
 }
 
 
@@ -63,14 +69,40 @@ class Settings(BaseSettings):
     diarizer_provider: str = "mock"
     ner_provider: str = "mock"
     classifier_provider: str = "mock"
+
+    # Generic Embedding & Reasoner Selection
     embedding_provider: str = Field(default="mock", alias="MEETINGOS_EMBEDDING_PROVIDER")
     embedding_model: str = Field(default="local-semantic-v1", alias="MEETINGOS_EMBEDDING_MODEL")
     embedding_base_url: str | None = Field(default=None, alias="MEETINGOS_EMBEDDING_BASE_URL")
     embedding_api_key: str | None = Field(default=None, alias="MEETINGOS_EMBEDDING_API_KEY")
+
     reasoner_provider: str = Field(default="mock", alias="MEETINGOS_REASONER_PROVIDER")
     reasoner_model: str = Field(default="local-reasoner-v1", alias="MEETINGOS_REASONER_MODEL")
     reasoner_base_url: str | None = Field(default=None, alias="MEETINGOS_REASONER_BASE_URL")
     reasoner_api_key: str | None = Field(default=None, alias="MEETINGOS_REASONER_API_KEY")
+
+    # Provider-Specific Configs
+    # Anthropic
+    anthropic_api_key: str | None = Field(default=None, alias="MEETINGOS_ANTHROPIC_API_KEY")
+    anthropic_model: str = Field(
+        default="claude-3-5-sonnet-20241022", alias="MEETINGOS_ANTHROPIC_MODEL"
+    )
+    anthropic_base_url: str = Field(
+        default="https://api.anthropic.com/v1", alias="MEETINGOS_ANTHROPIC_BASE_URL"
+    )
+
+    # Google Gemini
+    gemini_api_key: str | None = Field(default=None, alias="MEETINGOS_GEMINI_API_KEY")
+    gemini_model: str = Field(default="gemini-1.5-flash", alias="MEETINGOS_GEMINI_MODEL")
+    gemini_base_url: str = Field(
+        default="https://generativelanguage.googleapis.com", alias="MEETINGOS_GEMINI_BASE_URL"
+    )
+
+    # Scalable Worker & Hardware Acceleration
+    asr_device: Literal["cpu", "cuda", "auto"] = Field(default="cpu", alias="MEETINGOS_ASR_DEVICE")
+    asr_workers: int = Field(default=1, ge=1, alias="MEETINGOS_ASR_WORKERS")
+    nlp_workers: int = Field(default=2, ge=1, alias="MEETINGOS_NLP_WORKERS")
+    embedding_workers: int = Field(default=2, ge=1, alias="MEETINGOS_EMBEDDING_WORKERS")
 
     # Connector Configuration
     teams_enabled: bool = False
@@ -118,9 +150,23 @@ class Settings(BaseSettings):
                 raise ValueError(
                     "Production configuration error: OpenAI embedding provider configured without MEETINGOS_EMBEDDING_API_KEY."
                 )
+            if emb in ("gemini", "google") and not (self.gemini_api_key or self.embedding_api_key):
+                raise ValueError(
+                    "Production configuration error: Gemini embedding provider configured without MEETINGOS_GEMINI_API_KEY."
+                )
             if reas in ("openai", "openai_compatible", "llm") and not self.reasoner_api_key:
                 raise ValueError(
                     "Production configuration error: OpenAI reasoner provider configured without MEETINGOS_REASONER_API_KEY."
+                )
+            if reas in ("anthropic", "claude") and not (
+                self.anthropic_api_key or self.reasoner_api_key
+            ):
+                raise ValueError(
+                    "Production configuration error: Anthropic reasoner configured without MEETINGOS_ANTHROPIC_API_KEY."
+                )
+            if reas in ("gemini", "google") and not (self.gemini_api_key or self.reasoner_api_key):
+                raise ValueError(
+                    "Production configuration error: Gemini reasoner configured without MEETINGOS_GEMINI_API_KEY."
                 )
             if self.teams_enabled and (not self.teams_client_id or not self.teams_client_secret):
                 raise ValueError(
@@ -154,6 +200,9 @@ def validate_config() -> int:
         )
         print(
             f"     Reasoner Provider: {current_settings.reasoner_provider} ({current_settings.reasoner_model})"
+        )
+        print(
+            f"     ASR Hardware Device: {current_settings.asr_device} (Workers: {current_settings.asr_workers})"
         )
         print(
             f"     Database URL: {current_settings.database_url.split('@')[-1] if '@' in current_settings.database_url else 'configured'}"

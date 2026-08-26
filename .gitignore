@@ -60,6 +60,7 @@ model_cache/
 *.tar.gz
 
 # Ingestion audio/video data (keep fixtures/samples under version control)
+data/
 datasets/raw/*
 !datasets/raw/.gitkeep
 datasets/downloads/*

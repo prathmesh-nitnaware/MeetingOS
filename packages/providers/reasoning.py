@@ -343,6 +343,22 @@ def get_reasoner(
             base_url=base_url or "https://api.openai.com/v1",
             api_key=api_key,
         )
+    elif prov in ("anthropic", "claude"):
+        from packages.providers.anthropic import AnthropicReasoner
+
+        return AnthropicReasoner(
+            model_name=model_name or "claude-3-5-sonnet-20241022",
+            base_url=base_url or "https://api.anthropic.com/v1",
+            api_key=api_key,
+        )
+    elif prov in ("gemini", "google"):
+        from packages.providers.gemini import GeminiReasoner
+
+        return GeminiReasoner(
+            model_name=model_name or "gemini-1.5-flash",
+            base_url=base_url or "https://generativelanguage.googleapis.com",
+            api_key=api_key,
+        )
     elif prov in ("real", "local", "local_evidence"):
         return LocalEvidenceReasoner(model_name=model_name or "local-evidence-reasoner-v1")
     else:

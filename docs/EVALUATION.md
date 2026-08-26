@@ -1,123 +1,39 @@
-# MeetingOS Evaluation Plan
+# MeetingOS Research & Evaluation Framework
 
-## 1. Evaluation philosophy
+MeetingOS provides a quantitative evaluation harness measuring question-answering accuracy, retrieval recall, faithfulness, confidence calibration (Brier score), audio pipeline real-time factor, and human assessment.
 
-Every important layer should be measurable independently.
+---
 
-A visually impressive UI is not evidence that the NLP system works. Humans have unfortunately built entire industries around confusing those two things.
+## 1. Evaluation Datasets
 
-## 2. Component metrics
+| Dataset | Meetings | Questions | Scope | Format |
+| :--- | :---: | :---: | :--- | :--- |
+| `compositional_dataset.json` | 13 | 75 | 12 query categories, decision reversals, deadline slippages | Labeled JSON |
+| `manifest.json` | 3 | N/A | Real & synthetic audio recordings for ASR/Diarization RTF | Audio CMF Manifest |
+| `human_eval_template.json` | 13 | 75 | 8-dimension qualitative human assessment template | Rubric JSON |
 
-| Component | Metrics |
-|---|---|
-| NER | Precision, Recall, F1 |
-| Decision extraction | Precision, Recall, F1 |
-| Action extraction | Precision, Recall, F1 |
-| Commitment classification | Accuracy, F1 |
-| Retrieval | Recall@K, MRR |
-| QA | Answer correctness, evidence relevance, faithfulness |
-| Temporal reasoning | Accuracy of decision changes, deadline changes, issue lifecycles, event ordering |
+---
 
-## 3. Research comparison
+## 2. Evaluation Metrics
 
-Evaluate three systems on the same historical multi-meeting questions.
+1. **Answer Accuracy:** Strict factual agreement on compositional queries.
+2. **Retrieval Recall:** Recall over target transcript segments ($Recall = |S_{\text{retrieved}} \cap S_{\text{target}}| / |S_{\text{target}}|$).
+3. **Faithfulness:** Verification that synthesized answers do not contain claims unsupported by evidence.
+4. **Real-Time Factor (RTF):** $RTF = \text{total\_processing\_time} / \text{audio\_duration}$.
+5. **Confidence Calibration (Brier Score):** Mean squared error between confidence scores and binary correctness ($BS = \frac{1}{N} \sum (f_t - o_t)^2$).
+6. **Human Evaluation:** 8 standard Likert dimensions (Correctness, Evidence Support, Citation Quality, Temporal Correctness, Completeness, Hallucination, Helpfulness, Calibration).
 
-### System A — Keyword baseline
+---
 
-```text
-Transcript
-→ keyword search
-→ answer
+## 3. Reproduction Commands
+
+```bash
+# Execute local deterministic research benchmark
+python -m evaluation.phase14 --mode local
+
+# Execute benchmark with configured cloud providers (OpenAI, Anthropic, Gemini)
+python -m evaluation.phase14 --mode configured
+
+# Aggregate completed human evaluation annotations
+python -m evaluation.human_eval evaluation/reports/human_eval_phase14.json
 ```
-
-### System B — Vector RAG
-
-```text
-Transcript
-→ embeddings
-→ vector retrieval
-→ RAG
-→ answer
-```
-
-### System C — MeetingOS
-
-```text
-Transcript
-→ NLP extraction
-→ knowledge graph
-→ temporal memory
-→ hybrid retrieval
-→ RAG
-→ answer
-```
-
-## 4. Core hypothesis
-
-Structured temporal memory should improve historical organizational question answering compared with keyword search and standard vector RAG.
-
-This must be tested, not assumed.
-
-## 5. Evaluation dataset
-
-Build a multi-meeting corpus containing:
-- repeated topics
-- decisions that change
-- commitments with changing deadlines
-- issues spanning meetings
-- aliases/entity variants
-- temporal expressions
-- cross-meeting dependencies
-
-## 6. Annotation
-
-Each annotated example should support one or more tasks:
-- entity spans
-- utterance class
-- relations
-- decisions
-- commitments
-- actions
-- issues
-- events
-- temporal expressions
-- evidence spans
-
-## 7. Ablation studies
-
-Potential ablations:
-- no knowledge graph
-- no temporal reasoning
-- no entity resolution
-- no hybrid retrieval
-- no graph retrieval
-- vector-only retrieval
-- keyword-only retrieval
-
-Measure impact on historical QA and evidence quality.
-
-## 8. Error analysis
-
-Categorize errors:
-- ASR error
-- speaker attribution error
-- NER error
-- classification error
-- relation error
-- temporal normalization error
-- entity resolution error
-- retrieval miss
-- graph reasoning error
-- generation error
-- evidence attribution error
-
-## 9. Reproducibility
-
-Record:
-- dataset version
-- model versions
-- prompts where applicable
-- retrieval parameters
-- pipeline version
-- experiment configuration
-- evaluation seed where applicable
