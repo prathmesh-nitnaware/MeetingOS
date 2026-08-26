@@ -96,6 +96,8 @@ indent-style = "space"
 
 [tool.pyright]
 pythonVersion = "3.12"
+venvPath = "."
+venv = ".venv"
 typeCheckingMode = "standard"
 include = ["apps", "packages", "workers", "tests", "evaluation"]
 exclude = ["**/__pycache__", ".venv", "apps/web"]

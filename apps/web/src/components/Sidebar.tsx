@@ -7,6 +7,9 @@ import {
   Network,
   History,
   Activity,
+  GitBranch,
+  BarChart3,
+  Sliders,
   Settings
 } from "lucide-react"
 
@@ -54,6 +57,27 @@ export const Sidebar: React.FC = () => {
           <span>Timeline Intelligence</span>
         </NavLink>
         <NavLink
+          to="/traces"
+          className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`}
+        >
+          <GitBranch size={18} />
+          <span>Agent Traces</span>
+        </NavLink>
+        <NavLink
+          to="/metrics"
+          className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`}
+        >
+          <BarChart3 size={18} />
+          <span>Observability</span>
+        </NavLink>
+        <NavLink
+          to="/providers"
+          className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`}
+        >
+          <Sliders size={18} />
+          <span>AI Providers</span>
+        </NavLink>
+        <NavLink
           to="/settings"
           className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`}
         >
@@ -62,7 +86,7 @@ export const Sidebar: React.FC = () => {
         </NavLink>
       </nav>
       <div className="sidebar-footer">
-        <p>v0.1.0 • Stable</p>
+        <p>v0.1.0 • Phase 12 Production</p>
       </div>
     </aside>
   )

@@ -36,8 +36,12 @@ class Settings(BaseSettings):
     classifier_provider: str = "mock"
     embedding_provider: str = Field(default="mock", alias="MEETINGOS_EMBEDDING_PROVIDER")
     embedding_model: str = Field(default="local-semantic-v1", alias="MEETINGOS_EMBEDDING_MODEL")
+    embedding_base_url: str | None = Field(default=None, alias="MEETINGOS_EMBEDDING_BASE_URL")
+    embedding_api_key: str | None = Field(default=None, alias="MEETINGOS_EMBEDDING_API_KEY")
     reasoner_provider: str = Field(default="mock", alias="MEETINGOS_REASONER_PROVIDER")
     reasoner_model: str = Field(default="local-reasoner-v1", alias="MEETINGOS_REASONER_MODEL")
+    reasoner_base_url: str | None = Field(default=None, alias="MEETINGOS_REASONER_BASE_URL")
+    reasoner_api_key: str | None = Field(default=None, alias="MEETINGOS_REASONER_API_KEY")
 
     # Connector Configuration
     teams_enabled: bool = False

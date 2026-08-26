@@ -27,7 +27,11 @@ class AnswerAgent(BaseAgent):
                     AgentTraceItem(
                         agent="answer",
                         status="completed",
+                        trace_id=context.trace_id,
+                        query_id=context.query_id,
                         duration_seconds=round(duration, 4),
+                        latency_ms=round(duration * 1000, 2),
+                        output_summary="Insufficient evidence bypass",
                     )
                 )
                 return context
@@ -105,11 +109,17 @@ class AnswerAgent(BaseAgent):
                 context.confidence = min(context.confidence, ans_res.confidence)
 
             duration = time.perf_counter() - start_time
+            model_str = getattr(self.reasoner, "model_name", type(self.reasoner).__name__)
             context.trace.append(
                 AgentTraceItem(
                     agent="answer",
                     status="completed",
+                    trace_id=context.trace_id,
+                    query_id=context.query_id,
                     duration_seconds=round(duration, 4),
+                    latency_ms=round(duration * 1000, 2),
+                    model_name=model_str,
+                    output_summary=f"Generated {len(ans_res.answer)} chars answer, conf={context.confidence}",
                 )
             )
         except Exception as e:
@@ -118,8 +128,12 @@ class AnswerAgent(BaseAgent):
                 AgentTraceItem(
                     agent="answer",
                     status="failed",
+                    trace_id=context.trace_id,
+                    query_id=context.query_id,
                     duration_seconds=round(duration, 4),
+                    latency_ms=round(duration * 1000, 2),
                     error=str(e),
+                    error_type=type(e).__name__,
                 )
             )
             context.errors.append(f"AnswerAgent failed: {e}")

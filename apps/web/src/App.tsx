@@ -8,6 +8,9 @@ import SearchQA from "./pages/SearchQA"
 import EntitiesList from "./pages/EntitiesList"
 import TemporalTimeline from "./pages/TemporalTimeline"
 import Settings from "./pages/Settings"
+import TraceExplorer from "./pages/TraceExplorer"
+import MetricsDashboard from "./pages/MetricsDashboard"
+import ProvidersSettings from "./pages/ProvidersSettings"
 
 export const App: React.FC = () => {
   return (
@@ -25,6 +28,9 @@ export const App: React.FC = () => {
             <Route path="/search" element={<SearchQA />} />
             <Route path="/entities" element={<EntitiesList />} />
             <Route path="/temporal" element={<TemporalTimeline />} />
+            <Route path="/traces" element={<TraceExplorer />} />
+            <Route path="/metrics" element={<MetricsDashboard />} />
+            <Route path="/providers" element={<ProvidersSettings />} />
             <Route path="/settings" element={<Settings />} />
           </Routes>
         </main>

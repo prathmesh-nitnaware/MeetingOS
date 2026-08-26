@@ -3,7 +3,6 @@ import asyncio
 import json
 import random
 import time
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -572,7 +571,6 @@ async def run_phase11(mode: str = "real") -> int:
         aggregates: dict[str, dict[str, Any]] = {}
         for sys_name, runs in system_runs.items():
             keys = runs[0][2].keys()
-            n = len(runs)
             stat_dict: dict[str, Any] = {}
             for k in keys:
                 vals = [r[2][k] for r in runs]

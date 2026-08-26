@@ -12,9 +12,11 @@ from apps.api.routers.graph import router as graph_router
 from apps.api.routers.health import router as health_router
 from apps.api.routers.jobs import router as jobs_router
 from apps.api.routers.meetings import router as meetings_router
+from apps.api.routers.metrics import router as metrics_router
 from apps.api.routers.query import router as query_router
 from apps.api.routers.search import router as search_router
 from apps.api.routers.temporal import router as temporal_router
+from apps.api.routers.traces import router as traces_router
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from packages.memory.database import get_engine
@@ -75,6 +77,8 @@ def create_app() -> FastAPI:
     app.include_router(connectors_router, prefix=settings.api_v1_prefix)
     app.include_router(audit_router, prefix=settings.api_v1_prefix)
     app.include_router(admin_router, prefix=settings.api_v1_prefix)
+    app.include_router(traces_router, prefix=settings.api_v1_prefix)
+    app.include_router(metrics_router, prefix=settings.api_v1_prefix)
 
     @app.get("/")
     async def root_redirect() -> dict[str, str]:

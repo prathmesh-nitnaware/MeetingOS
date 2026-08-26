@@ -1,4 +1,5 @@
 import math
+
 import pytest
 from packages.common.models import EvidenceItem
 from packages.nlp.mock import MockEmbedder

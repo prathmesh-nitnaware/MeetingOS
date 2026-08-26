@@ -17,18 +17,12 @@ class RetrievalAgent(BaseAgent):
         try:
             person = context.plan.person if context.plan else None
             topic = context.plan.topic if context.plan else None
-            raw_type = context.plan.type if context.plan else None
-
-            # HybridSearchEngine understands None/"all"/"transcript"/"decision"/"action"/"issue"
-            # The planner may return "segment" which is not a valid filter — treat as None (search all)
-            VALID_TYPES = {"all", "transcript", "decision", "action", "issue"}
-            result_type = raw_type if raw_type in VALID_TYPES else None
 
             search_res = await self.search_engine.search(
                 query=context.query,
                 person=person,
                 topic=topic,
-                result_type=result_type,
+                result_type=None,
             )
 
             evidence_added = 0

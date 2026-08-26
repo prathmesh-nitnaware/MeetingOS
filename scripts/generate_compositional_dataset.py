@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 
 datasets_dir = Path(r"d:\MeetingOS\datasets\evaluation")
-with open(datasets_dir / "extended_dataset.json", "r", encoding="utf-8") as f:
+with (datasets_dir / "extended_dataset.json").open("r", encoding="utf-8") as f:
     existing_questions = json.load(f)
 
 new_questions = [
@@ -348,7 +348,7 @@ new_questions = [
 
 total_dataset = existing_questions + new_questions
 out_path = datasets_dir / "compositional_dataset.json"
-with open(out_path, "w", encoding="utf-8") as f:
+with out_path.open("w", encoding="utf-8") as f:
     json.dump(total_dataset, f, indent=2)
 
 print(

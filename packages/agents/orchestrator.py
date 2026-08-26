@@ -1,4 +1,5 @@
 import asyncio
+import time
 
 from packages.agents.answer import AnswerAgent
 from packages.agents.context import AgentContext, AgentResult, AgentTraceItem
@@ -7,12 +8,13 @@ from packages.agents.graph import GraphAgent
 from packages.agents.planner import PlannerAgent
 from packages.agents.retrieval import RetrievalAgent
 from packages.agents.temporal import TemporalAgent
+from packages.agents.traces import AgentExecutionTrace, global_trace_store
 from packages.reasoning.interfaces import BaseReasoner
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
 class AgentOrchestrator:
-    """Central controller managing query classification, specialist routing, evidence checks, and answer synthesis."""
+    """Central controller managing query classification, specialist routing, evidence checks, answer synthesis, and trace persistence."""
 
     def __init__(self, session: AsyncSession, reasoner: BaseReasoner | None = None) -> None:
         self.session = session
@@ -24,6 +26,7 @@ class AgentOrchestrator:
         self.answer_agent = AnswerAgent(reasoner)
 
     async def query(self, question: str) -> AgentResult:
+        t_start = time.perf_counter()
         context = AgentContext(query=question)
 
         # 1. Planner Agent
@@ -45,14 +48,28 @@ class AgentOrchestrator:
             tasks.append(self.graph_agent.run(context))
         else:
             context.trace.append(
-                AgentTraceItem(agent="graph", status="skipped", duration_seconds=0.0)
+                AgentTraceItem(
+                    agent="graph",
+                    status="skipped",
+                    trace_id=context.trace_id,
+                    query_id=context.query_id,
+                    duration_seconds=0.0,
+                    latency_ms=0.0,
+                )
             )
 
         if run_temporal:
             tasks.append(self.temporal_agent.run(context))
         else:
             context.trace.append(
-                AgentTraceItem(agent="temporal", status="skipped", duration_seconds=0.0)
+                AgentTraceItem(
+                    agent="temporal",
+                    status="skipped",
+                    trace_id=context.trace_id,
+                    query_id=context.query_id,
+                    duration_seconds=0.0,
+                    latency_ms=0.0,
+                )
             )
 
         # 2. Parallel Specialist Execution
@@ -75,8 +92,7 @@ class AgentOrchestrator:
                 citations.append(citation_str)
 
         # Generate reasoning summary chain
-        active_agents = ["planner"]
-        active_agents.append("retrieval")
+        active_agents = ["planner", "retrieval"]
         if run_graph:
             active_agents.append("graph")
         if run_temporal:
@@ -85,6 +101,22 @@ class AgentOrchestrator:
         active_agents.append("answer")
 
         reasoning_summary = " → ".join(a.capitalize() for a in active_agents)
+        total_latency_ms = (time.perf_counter() - t_start) * 1000.0
+
+        # Save trace to persistent TraceStore
+        exec_trace = AgentExecutionTrace(
+            trace_id=context.trace_id,
+            query_id=context.query_id,
+            query=question,
+            answer=context.answer,
+            confidence=context.confidence,
+            insufficient_evidence=context.insufficient_evidence,
+            total_latency_ms=round(total_latency_ms, 2),
+            steps=context.trace,
+            citations=citations,
+            conflicts=context.conflicts_detected,
+        )
+        global_trace_store.save_trace(exec_trace)
 
         return AgentResult(
             answer=context.answer,
@@ -94,4 +126,7 @@ class AgentOrchestrator:
             reasoning_summary=reasoning_summary,
             trace=context.trace,
             insufficient_evidence=context.insufficient_evidence,
+            trace_id=context.trace_id,
+            query_id=context.query_id,
+            conflicts=context.conflicts_detected,
         )
