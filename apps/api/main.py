@@ -3,6 +3,7 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 from apps.api.config import settings
+from apps.api.middleware.logging import StructuredLoggingMiddleware
 from apps.api.routers.admin import router as admin_router
 from apps.api.routers.audit import router as audit_router
 from apps.api.routers.connectors import router as connectors_router
@@ -55,10 +56,14 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
+    # Middleware registration
+    app.add_middleware(StructuredLoggingMiddleware)
+
     # CORS configuration
+    cors_origins = settings.allowed_origins if settings.allowed_origins else ["*"]
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
+        allow_origins=cors_origins,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],

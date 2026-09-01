@@ -1,0 +1,32 @@
+{
+  "version": "0.1.0",
+  "timestamp": "2026-09-01T13:30:09.412677+00:00",
+  "gates": {
+    "code_quality_ruff": {
+      "status": "PASSED",
+      "exit_code": 0,
+      "details": "Clean (0 lint errors, 0 format diffs)"
+    },
+    "docker_compose_profile": {
+      "status": "PASSED",
+      "exit_code": 0,
+      "details": "Validated all 9 containers and isolated bridge network"
+    },
+    "test_suite": {
+      "status": "PASSED",
+      "exit_code": 0,
+      "details": "All unit, integration, RBAC, temporal, and E2E query tests passed"
+    },
+    "provider_smoke": {
+      "status": "PASSED",
+      "exit_code": 0,
+      "details": "Embedders and reasoners validated with safe fallback handling"
+    },
+    "frontend_build": {
+      "status": "PASSED",
+      "exit_code": 0,
+      "details": "SPA production bundle built successfully"
+    }
+  },
+  "overall_status": "PASSED (RELEASE CANDIDATE READY)"
+}

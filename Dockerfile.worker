@@ -1,0 +1,35 @@
+# syntax=docker/dockerfile:1
+FROM python:3.12-slim AS base
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+WORKDIR /app
+
+# Install system dependencies (ffmpeg for audio decoding)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    curl \
+    ffmpeg \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN pip install --no-cache-dir uv
+
+COPY pyproject.toml uv.lock* ./
+
+RUN uv venv .venv && \
+    uv pip install --no-cache -r pyproject.toml
+
+ENV PATH="/app/.venv/bin:$PATH"
+
+COPY apps ./apps
+COPY packages ./packages
+COPY workers ./workers
+COPY datasets ./datasets
+COPY evaluation ./evaluation
+
+# Default command: Celery worker for general tasks
+CMD ["celery", "-A", "workers.celery_app", "worker", "--loglevel=info"]

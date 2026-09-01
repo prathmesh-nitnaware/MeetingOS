@@ -1,0 +1,47 @@
+{
+  "timestamp": "2026-09-01T13:31:15.170804+00:00",
+  "environment": "development",
+  "embedders": {
+    "local_semantic": {
+      "status": "PASSED",
+      "latency_ms": 0.79,
+      "dimension": 384,
+      "sample_vector_norm": 0.015
+    },
+    "sentence_transformers": {
+      "status": "PASSED",
+      "latency_ms": 1.09,
+      "dimension": 384,
+      "sample_vector_norm": 0.015
+    },
+    "openai": {
+      "status": "SKIPPED",
+      "reason": "No real API key configured"
+    },
+    "gemini": {
+      "status": "SKIPPED",
+      "reason": "No real API key configured"
+    }
+  },
+  "reasoners": {
+    "local_evidence": {
+      "status": "PASSED",
+      "latency_ms": 0.11,
+      "confidence": 0.88,
+      "answer_preview": "Based on meeting records: The engineering architecture council approved PostgreSQL with pgvector as the primary organiza",
+      "evidence_count": 1
+    },
+    "openai": {
+      "status": "SKIPPED",
+      "reason": "No real API key configured"
+    },
+    "anthropic": {
+      "status": "SKIPPED",
+      "reason": "No real API key configured"
+    },
+    "gemini": {
+      "status": "SKIPPED",
+      "reason": "No real API key configured"
+    }
+  }
+}

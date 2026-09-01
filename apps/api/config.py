@@ -45,12 +45,16 @@ class Settings(BaseSettings):
         populate_by_name=True,
     )
 
-    # Core Application
+    # Core Application & Security
     app_name: str = "MeetingOS API"
-    app_version: str = "0.1.0"
+    app_version: str = "1.0.0-rc1"
     app_env: Literal["development", "test", "staging", "production"] = "development"
     app_debug: bool = True
     api_v1_prefix: str = "/api/v1"
+    secret_key: str = Field(
+        default="dev-insecure-secret-key-change-in-production", alias="MEETINGOS_SECRET_KEY"
+    )
+    allowed_origins: list[str] = Field(default=["*"], alias="MEETINGOS_ALLOWED_ORIGINS")
 
     # Database
     database_url: str = Field(
@@ -63,6 +67,12 @@ class Settings(BaseSettings):
     # Storage & Uploads
     upload_storage_dir: str = Field(default="./data/uploads")
     max_upload_size_mb: int = Field(default=500, gt=0)
+
+    # Rate Limiting (Requests per minute)
+    rate_limit_query_per_min: int = Field(default=60, ge=1, alias="MEETINGOS_RATE_LIMIT_QUERY")
+    rate_limit_upload_per_min: int = Field(default=10, ge=1, alias="MEETINGOS_RATE_LIMIT_UPLOAD")
+    rate_limit_agentic_per_min: int = Field(default=20, ge=1, alias="MEETINGOS_RATE_LIMIT_AGENTIC")
+    rate_limit_admin_per_min: int = Field(default=30, ge=1, alias="MEETINGOS_RATE_LIMIT_ADMIN")
 
     # Speech / ML Providers
     asr_provider: str = "mock"
@@ -136,6 +146,14 @@ class Settings(BaseSettings):
                 f"Allowed: {sorted(VALID_REASONER_PROVIDERS)}"
             )
 
+        # Validate database url scheme
+        if not self.database_url.startswith(
+            "postgresql+asyncpg://"
+        ) and not self.database_url.startswith("sqlite+aiosqlite://"):
+            raise ValueError(
+                "Invalid DATABASE_URL: must use an async scheme ('postgresql+asyncpg://' or 'sqlite+aiosqlite://')."
+            )
+
         # Validate production environment security constraints
         if self.app_env == "production":
             if "meetingos_secret_password" in self.database_url:
@@ -145,6 +163,22 @@ class Settings(BaseSettings):
             if self.app_debug:
                 raise ValueError(
                     "Production configuration error: app_debug must be False in production."
+                )
+            if (
+                not self.secret_key
+                or len(self.secret_key) < 16
+                or any(w in self.secret_key.lower() for w in ("insecure", "dev", "test", "default"))
+            ):
+                raise ValueError(
+                    "Production configuration error: MEETINGOS_SECRET_KEY must be a secure, non-default string of at least 16 characters."
+                )
+            if "*" in self.allowed_origins:
+                raise ValueError(
+                    "Production configuration error: Wildcard '*' in MEETINGOS_ALLOWED_ORIGINS is prohibited in production."
+                )
+            if self.max_upload_size_mb > 2000:
+                raise ValueError(
+                    "Production configuration error: max_upload_size_mb exceeds maximum production limit (2000 MB)."
                 )
             if emb in ("openai", "openai_compatible") and not self.embedding_api_key:
                 raise ValueError(

@@ -1,0 +1,196 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: meetingos-postgres-prod
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-meetingos}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-meetingos_secret_password}
+      POSTGRES_DB: ${POSTGRES_DB:-meetingos_db}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pgdata_prod:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-meetingos} -d ${POSTGRES_DB:-meetingos_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - meetingos-net
+
+  redis:
+    image: redis:7-alpine
+    container_name: meetingos-redis-prod
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redisdata_prod:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - meetingos-net
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: meetingos-api-prod
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - APP_ENV=production
+      - APP_DEBUG=false
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-meetingos}:${POSTGRES_PASSWORD:-meetingos_secret_password}@postgres:5432/${POSTGRES_DB:-meetingos_db}
+      - REDIS_URL=redis://redis:6379/0
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - meetingos-net
+
+  worker-asr:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    container_name: meetingos-worker-asr
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - APP_ENV=production
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-meetingos}:${POSTGRES_PASSWORD:-meetingos_secret_password}@postgres:5432/${POSTGRES_DB:-meetingos_db}
+      - REDIS_URL=redis://redis:6379/0
+    command: ["celery", "-A", "workers.celery_app", "worker", "-Q", "meetingos.asr", "-c", "1", "--loglevel=info"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - meetingos-net
+
+  worker-nlp:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    container_name: meetingos-worker-nlp
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - APP_ENV=production
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-meetingos}:${POSTGRES_PASSWORD:-meetingos_secret_password}@postgres:5432/${POSTGRES_DB:-meetingos_db}
+      - REDIS_URL=redis://redis:6379/0
+    command: ["celery", "-A", "workers.celery_app", "worker", "-Q", "meetingos.nlp", "-c", "2", "--loglevel=info"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - meetingos-net
+
+  worker-embedding:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    container_name: meetingos-worker-embedding
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - APP_ENV=production
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-meetingos}:${POSTGRES_PASSWORD:-meetingos_secret_password}@postgres:5432/${POSTGRES_DB:-meetingos_db}
+      - REDIS_URL=redis://redis:6379/0
+    command: ["celery", "-A", "workers.celery_app", "worker", "-Q", "meetingos.embedding", "-c", "2", "--loglevel=info"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - meetingos-net
+
+  worker-sync:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    container_name: meetingos-worker-sync
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - APP_ENV=production
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-meetingos}:${POSTGRES_PASSWORD:-meetingos_secret_password}@postgres:5432/${POSTGRES_DB:-meetingos_db}
+      - REDIS_URL=redis://redis:6379/0
+    command: ["celery", "-A", "workers.celery_app", "worker", "-Q", "meetingos.sync", "-c", "2", "--loglevel=info"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - meetingos-net
+
+  worker-default:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    container_name: meetingos-worker-default
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - APP_ENV=production
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-meetingos}:${POSTGRES_PASSWORD:-meetingos_secret_password}@postgres:5432/${POSTGRES_DB:-meetingos_db}
+      - REDIS_URL=redis://redis:6379/0
+    command: ["celery", "-A", "workers.celery_app", "worker", "-Q", "default", "-c", "2", "--loglevel=info"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - meetingos-net
+
+  frontend:
+    build:
+      context: ./apps/web
+      dockerfile: Dockerfile
+    container_name: meetingos-frontend-prod
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - meetingos-net
+
+networks:
+  meetingos-net:
+    name: meetingos-net
+    driver: bridge
+
+volumes:
+  pgdata_prod:
+    name: meetingos_pgdata_prod
+    driver: local
+  redisdata_prod:
+    name: meetingos_redisdata_prod
+    driver: local

@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 from typing import BinaryIO
 
@@ -20,11 +21,28 @@ class FileValidationError(ValueError):
     pass
 
 
+def sanitize_filename(filename: str) -> str:
+    """Sanitize uploaded filename to prevent directory traversal and injection attacks."""
+    if not filename:
+        raise FileValidationError("Filename cannot be empty.")
+
+    # Strip directory components and null bytes
+    base = Path(filename.replace("\\", "/")).name.replace("\x00", "")
+    # Remove traversal sequences
+    base = re.sub(r"\.+[/\\]", "", base)
+    # Allow alphanumeric, underscore, hyphen, and dots
+    clean = re.sub(r"[^a-zA-Z0-9._-]", "_", base)
+    if not clean or clean.startswith("."):
+        clean = f"upload_{clean}"
+    return clean
+
+
 def validate_file_extension(filename: str) -> SourceType:
     """Validate file extension and return its SourceType."""
-    ext = Path(filename).suffix.lower()
+    sanitized = sanitize_filename(filename)
+    ext = Path(sanitized).suffix.lower()
     if not ext or ext not in EXTENSION_TO_SOURCE_TYPE:
-        supported = ", ".join(EXTENSION_TO_SOURCE_TYPE.keys())
+        supported = ", ".join(sorted(EXTENSION_TO_SOURCE_TYPE.keys()))
         raise FileValidationError(
             f"Unsupported file extension '{ext}' for file '{filename}'. Supported extensions: {supported}"
         )
@@ -62,16 +80,21 @@ def save_upload_file(upload_file: BinaryIO, destination_path: Path, max_size_mb:
     total_bytes = 0
     max_bytes = max_size_mb * 1024 * 1024
 
-    with destination_path.open("wb") as out_file:
-        while chunk := upload_file.read(1024 * 1024):  # 1MB chunks
-            total_bytes += len(chunk)
-            if total_bytes > max_bytes:
-                raise FileValidationError(f"Upload exceeded maximum size of {max_size_mb} MB.")
-            out_file.write(chunk)
+    try:
+        with destination_path.open("wb") as out_file:
+            while chunk := upload_file.read(1024 * 1024):  # 1MB chunks
+                total_bytes += len(chunk)
+                if total_bytes > max_bytes:
+                    raise FileValidationError(f"Upload exceeded maximum size of {max_size_mb} MB.")
+                out_file.write(chunk)
 
-    if total_bytes == 0:
+        if total_bytes == 0:
+            if destination_path.exists():
+                destination_path.unlink()
+            raise FileValidationError("Uploaded file is empty.")
+
+        return total_bytes
+    except Exception:
         if destination_path.exists():
             destination_path.unlink()
-        raise FileValidationError("Uploaded file is empty.")
-
-    return total_bytes
+        raise

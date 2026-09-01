@@ -47,6 +47,8 @@ def test_production_mode_security_validation():
             app_env="production",
             database_url="postgresql+asyncpg://meetingos:secure_prod_password@db:5432/meetingos_db",
             app_debug=False,
+            MEETINGOS_SECRET_KEY="A_Valid_Production_Secret_Key_12345!",
+            MEETINGOS_ALLOWED_ORIGINS=["https://app.meetingos.internal"],
             MEETINGOS_EMBEDDING_PROVIDER="openai",  # pyright: ignore[reportCallIssue]
             MEETINGOS_EMBEDDING_API_KEY=None,  # pyright: ignore[reportCallIssue]
         )

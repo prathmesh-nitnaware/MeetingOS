@@ -1,82 +1,36 @@
-# MeetingOS Security and Privacy Requirements
+# MeetingOS Security Architecture & Threat Model
 
-Meeting data can contain confidential organizational information. Security is part of the architecture, not a future decorative sticker.
+This document outlines the security architecture, authentication model, threat vector mitigations, and compliance standards implemented in MeetingOS.
 
-## 1. Data principles
+---
 
-- Minimize collected data.
-- Preserve provenance.
-- Restrict access by organization/user where multi-user support exists.
-- Never log raw transcripts by default.
-- Never expose secrets in model prompts or logs unless explicitly required.
-- Define retention/deletion behavior.
+## 1. Authentication & Role-Based Access Control (RBAC)
 
-## 2. File ingestion security
+MeetingOS enforces a 3-tier Role-Based Access Control (RBAC) model via FastAPI security dependencies (`apps/api/auth.py`).
 
-Validate:
-- file type
-- file size
-- filename
-- content
-- processing limits
+| Role | Permissions | Access Scope |
+| :--- | :--- | :--- |
+| **`admin`** | Full access to all endpoints, configuration, provider settings, worker status, and raw metrics. | `/api/v1/admin/*`, `/api/v1/audit/*`, `/api/v1/connectors/*`, and all user APIs. |
+| **`member`** | Ingest meetings, trigger NLP extractions, perform search, execute agentic reasoning queries, view traces. | `/api/v1/meetings/*`, `/api/v1/search`, `/api/v1/query/*`, `/api/v1/traces`. |
+| **`viewer`** | Read-only access to organizational dashboard, meeting summaries, timelines, and entity graphs. | `/api/v1/dashboard`, `/api/v1/meetings` (GET only), `/api/v1/temporal/*`, `/api/v1/graph/*`. |
 
-Treat uploaded files as untrusted input.
+---
 
-## 3. Access control
+## 2. Threat Mitigations & Defense-in-Depth
 
-Future production system should support:
-- authentication
-- authorization
-- organization/tenant boundaries
-- meeting-level access controls where needed
+### A. Path Traversal & Malicious File Uploads
+- **Filename Sanitization:** `sanitize_filename` strips directory components (`..`, `/`, `\`), null bytes (`\x00`), and non-whitelisted characters.
+- **Strict Extension Whitelist:** Only `.wav`, `.mp3`, `.m4a`, `.mp4`, `.srt`, `.txt` files are accepted. All executable or unknown extensions are rejected with HTTP 400.
+- **Upload Size Limits:** Hard maximum limit (default 500 MB) enforced during streaming, with automatic disk cleanup on violation.
 
-## 4. Model security
+### B. Credential Leakage Prevention
+- **Zero Credential Exposure:** Recursive secret sanitization (`sanitize_trace_data` and `_sanitize_secrets`) scrubs API keys, bearer tokens, passwords, and private tokens from execution traces, audit logs, and exception strings.
+- **CORS Hardening:** Production environment strictly forbids wildcard `*` CORS origins; specific trusted frontend domains must be declared in `MEETINGOS_ALLOWED_ORIGINS`.
 
-External model providers must be treated as data processors.
+### C. Rate Limiting & Abuse Prevention
+- **Sliding Window:** Redis sliding window limiter tracks per-IP and per-token request rates.
+- **Route Quotas:** Configurable per-route rate limits (queries, uploads, agentic reasoning, admin operations) with automatic in-memory fallback if Redis is unavailable.
 
-Before sending transcript content externally, define:
-- what data leaves the system
-- retention behavior
-- provider terms
-- redaction requirements
-
-## 5. Prompt injection
-
-Meeting transcripts may contain malicious or misleading instructions.
-
-Transcript content is **data**, not system instructions.
-
-The RAG pipeline must separate:
-- system instructions
-- user question
-- retrieved evidence
-
-Retrieved text must never be allowed to override system behavior.
-
-## 6. Evidence security
-
-Evidence shown to a user must respect the same authorization rules as the underlying meeting.
-
-## 7. Auditability
-
-Record security-relevant events such as:
-- authentication
-- authorization failures
-- data deletion
-- exports
-- administrative actions
-
-Avoid putting transcript contents into audit logs.
-
-## 8. Deletion
-
-Deletion must cover:
-- meeting metadata
-- transcripts
-- embeddings
-- extracted facts
-- graph relationships
-- evidence
-- derived caches
-
-Derived memory must not survive deletion accidentally.
+### D. Audit Logging & Traceability
+- **Security Audit Trails:** Security-sensitive operations (connector sync, provider updates, role changes) are recorded in the `audit_logs` table with actor ID, timestamp, outcome, and metadata.
+- **Correlation IDs:** Every HTTP request receives a unique `X-Request-ID` attached to response headers and structured access logs.
