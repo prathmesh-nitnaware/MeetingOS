@@ -1,8 +1,9 @@
+import json
 import logging
 import sys
-from typing import Literal
+from typing import Any, Literal
 
-from pydantic import Field, model_validator
+from pydantic import AliasChoices, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 logger = logging.getLogger("meetingos.config")
@@ -54,12 +55,36 @@ class Settings(BaseSettings):
     secret_key: str = Field(
         default="dev-insecure-secret-key-change-in-production", alias="MEETINGOS_SECRET_KEY"
     )
-    allowed_origins: list[str] = Field(default=["*"], alias="MEETINGOS_ALLOWED_ORIGINS")
+    allowed_origins: str | list[str] = Field(default=["*"], alias="MEETINGOS_ALLOWED_ORIGINS")
+
+    @field_validator("allowed_origins", mode="after")
+    @classmethod
+    def parse_allowed_origins(cls, v: Any) -> list[str]:
+        if isinstance(v, str):
+            if v.startswith("[") and v.endswith("]"):
+                try:
+                    return json.loads(v)
+                except Exception:
+                    pass
+            return [origin.strip() for origin in v.split(",") if origin.strip()]
+        if isinstance(v, list):
+            return v
+        return ["*"]
 
     # Database
     database_url: str = Field(
         default="postgresql+asyncpg://meetingos:meetingos_secret_password@localhost:5432/meetingos_db"
     )
+
+    @field_validator("database_url", mode="after")
+    @classmethod
+    def normalize_database_url(cls, v: str) -> str:
+        url = v.strip()
+        if url.startswith("postgres://"):
+            url = "postgresql+asyncpg://" + url[len("postgres://") :]
+        elif url.startswith("postgresql://") and not url.startswith("postgresql+asyncpg://"):
+            url = "postgresql+asyncpg://" + url[len("postgresql://") :]
+        return url
 
     # Redis
     redis_url: str = Field(default="redis://localhost:6379/0")
@@ -84,12 +109,22 @@ class Settings(BaseSettings):
     embedding_provider: str = Field(default="mock", alias="MEETINGOS_EMBEDDING_PROVIDER")
     embedding_model: str = Field(default="local-semantic-v1", alias="MEETINGOS_EMBEDDING_MODEL")
     embedding_base_url: str | None = Field(default=None, alias="MEETINGOS_EMBEDDING_BASE_URL")
-    embedding_api_key: str | None = Field(default=None, alias="MEETINGOS_EMBEDDING_API_KEY")
+    embedding_api_key: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "MEETINGOS_EMBEDDING_API_KEY", "MEETINGOS_OPENAI_API_KEY", "OPENAI_API_KEY"
+        ),
+    )
 
     reasoner_provider: str = Field(default="mock", alias="MEETINGOS_REASONER_PROVIDER")
     reasoner_model: str = Field(default="local-reasoner-v1", alias="MEETINGOS_REASONER_MODEL")
     reasoner_base_url: str | None = Field(default=None, alias="MEETINGOS_REASONER_BASE_URL")
-    reasoner_api_key: str | None = Field(default=None, alias="MEETINGOS_REASONER_API_KEY")
+    reasoner_api_key: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "MEETINGOS_REASONER_API_KEY", "MEETINGOS_OPENAI_API_KEY", "OPENAI_API_KEY"
+        ),
+    )
 
     # Provider-Specific Configs
     # Anthropic
