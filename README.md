@@ -1,4 +1,4 @@
-﻿<div align="center">
+<div align="center">
 
 # MeetingOS
 
@@ -502,14 +502,51 @@ class Meeting(BaseSchema):
 
 ## 14. Quickstart
 
-### Prerequisites
+### Single-Command Start (Recommended)
+
+Run the entire system (Docker infrastructure, database migrations, FastAPI backend, React web frontend, and Celery workers) with one command:
+
+```bash
+# Python (Cross-platform)
+python run_all.py
+
+# Or with uv
+uv run python run_all.py
+
+# Windows PowerShell
+.\run_all.ps1
+
+# Windows Command Prompt
+run_all.bat
+```
+
+> [!TIP]
+> **Options for `run_all`:**
+> - `python run_all.py --open` to automatically launch the web browser once ready.
+> - `python run_all.py --no-docker` if your database is hosted remotely (e.g. Neon) and you don't need local Docker.
+> - `python run_all.py --no-worker` to run only the API and Web UI without Celery.
+> - Press `Ctrl+C` in the terminal to cleanly terminate all processes simultaneously.
+
+Services will be accessible at:
+- **Web Frontend**: [http://localhost:5173](http://localhost:5173)
+- **API Server**: [http://localhost:8000](http://localhost:8000)
+- **Interactive Swagger Docs**: [http://localhost:8000/api/v1/docs](http://localhost:8000/api/v1/docs)
+- **Health Check Probe**: [http://localhost:8000/api/v1/health](http://localhost:8000/api/v1/health)
+
+---
+
+### Step-by-Step Manual Setup
+
+If you prefer to start each component in individual terminal windows:
+
+#### Prerequisites
 
 - Python >= 3.12
 - [uv](https://docs.astral.sh/uv/) (recommended) or pip
 - Docker and Docker Compose (for PostgreSQL + Redis)
 - Node.js >= 18 (for frontend only)
 
-### 1. Clone and Install Dependencies
+#### 1. Clone and Install Dependencies
 
 ```bash
 git clone https://github.com/prathmesh-nitnaware/MeetingOS.git
@@ -522,14 +559,14 @@ uv sync --dev
 pip install -e ".[dev]"
 ```
 
-### 2. Start Infrastructure
+#### 2. Start Infrastructure
 
 ```bash
 docker compose up -d
 docker compose ps
 ```
 
-### 3. Configure Environment
+#### 3. Configure Environment
 
 ```bash
 cp .env.example .env
@@ -545,13 +582,13 @@ REDIS_URL=redis://localhost:6379/0
 
 Everything else uses safe defaults.
 
-### 4. Initialize the Database
+#### 4. Initialize the Database
 
 ```bash
 uv run alembic upgrade head
 ```
 
-### 5. Start the API Server
+#### 5. Start the API Server
 
 ```bash
 uv run uvicorn apps.api.main:app --host 0.0.0.0 --port 8000 --reload
@@ -559,7 +596,7 @@ uv run uvicorn apps.api.main:app --host 0.0.0.0 --port 8000 --reload
 
 API documentation: **http://localhost:8000/docs**
 
-### 6. Start the Frontend (Optional)
+#### 6. Start the Frontend
 
 ```bash
 cd apps/web
@@ -568,14 +605,14 @@ npm run dev
 # Runs at http://localhost:5173
 ```
 
-### 7. Start Celery Workers (Optional)
+#### 7. Start Celery Workers (Optional)
 
 ```bash
 uv run celery -A workers.celery_app worker --loglevel=info \
   -Q meetingos.asr,meetingos.nlp,meetingos.embedding,meetingos.sync
 ```
 
-### Production Deployment
+#### Production Deployment
 
 ```bash
 docker compose -f docker-compose.prod.yml up -d
