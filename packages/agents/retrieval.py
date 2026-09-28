@@ -9,8 +9,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 class RetrievalAgent(BaseAgent):
     """Retrieval Agent that interacts with HybridSearchEngine to retrieve grounded evidence candidates."""
 
-    def __init__(self, session: AsyncSession) -> None:
-        self.search_engine = HybridSearchEngine(session)
+    def __init__(self, session: AsyncSession, org_id: str = "org_dev") -> None:
+        self.search_engine = HybridSearchEngine(session, org_id=org_id)
 
     async def run(self, context: AgentContext) -> AgentContext:
         start_time = time.perf_counter()

@@ -9,8 +9,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 class TemporalAgent(BaseAgent):
     """Temporal Agent that reconstructs fact lifecycles and chronology using TemporalIntelligenceEngine."""
 
-    def __init__(self, session: AsyncSession) -> None:
-        self.temporal_engine = TemporalIntelligenceEngine(session)
+    def __init__(self, session: AsyncSession, org_id: str = "org_dev") -> None:
+        self.temporal_engine = TemporalIntelligenceEngine(session, org_id=org_id)
 
     async def run(self, context: AgentContext) -> AgentContext:
         start_time = time.perf_counter()

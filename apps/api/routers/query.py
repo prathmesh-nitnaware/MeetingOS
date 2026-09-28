@@ -12,10 +12,11 @@ router = APIRouter(tags=["Query Intelligence"])
 @router.post("/query", response_model=QueryResponse)
 async def query_organizational_memory(
     request: QueryRequest,
+    user: UserIdentity = Depends(require_viewer),
 ) -> QueryResponse:
-    """Answer historical organizational questions using multi-channel retrieval, knowledge graph context, and grounded evidence attribution."""
+    """Answer historical organisational questions using multi-channel retrieval, knowledge graph context, and grounded evidence attribution."""
     async with get_db_session(settings.database_url) as session:
-        pipeline = RAGPipeline(session)
+        pipeline = RAGPipeline(session, org_id=user.org_id)
         return await pipeline.answer_question(
             question=request.question,
             plan_override=request.query_plan_override,
@@ -28,7 +29,7 @@ async def query_organizational_memory_agentic(
     request: QueryRequest,
     _user: UserIdentity = Depends(require_viewer),
 ) -> AgentResult:
-    """Answer historical organizational questions using a controlled multi-agent reasoning system."""
+    """Answer historical organisational questions using a controlled multi-agent reasoning system."""
     async with get_db_session(settings.database_url) as session:
-        orchestrator = AgentOrchestrator(session)
+        orchestrator = AgentOrchestrator(session, org_id=_user.org_id)
         return await orchestrator.query(request.question)

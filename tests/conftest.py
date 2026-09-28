@@ -87,6 +87,26 @@ async def test_repository(test_db_session: AsyncSession) -> MeetingRepository:
 
 
 @pytest.fixture
+def auth_headers() -> dict[str, str]:
+    return {"Authorization": "Bearer admin-secret-token"}
+
+
+@pytest.fixture
+def member_headers() -> dict[str, str]:
+    return {"Authorization": "Bearer member-secret-token"}
+
+
+@pytest.fixture
+def viewer_headers() -> dict[str, str]:
+    return {"Authorization": "Bearer viewer-secret-token"}
+
+
+@pytest.fixture
+def beta_auth_headers() -> dict[str, str]:
+    return {"Authorization": "Bearer admin-beta-token"}
+
+
+@pytest.fixture
 async def async_client(tmp_path: Path) -> AsyncGenerator[AsyncClient, None]:
     """FastAPI test client with isolated SQLite database and temp storage."""
     test_db_file = tmp_path / "test_meetingos.db"
@@ -104,7 +124,11 @@ async def async_client(tmp_path: Path) -> AsyncGenerator[AsyncClient, None]:
 
     test_app = create_app()
     transport = ASGITransport(app=test_app)
-    async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+    async with AsyncClient(
+        transport=transport,
+        base_url="http://testserver",
+        headers={"Authorization": "Bearer admin-secret-token"},
+    ) as client:
         yield client
 
     await engine.dispose()

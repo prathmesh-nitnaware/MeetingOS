@@ -30,20 +30,28 @@ class QueryResponse(BaseModel):
 
 
 class RAGPipeline:
-    """Full Question-Answering and Reasoning Pipeline orchestrating Planning, Hybrid Retrieval, Graph Traversal, and Answer Generation."""
+    """Full Question-Answering and Reasoning Pipeline orchestrating Planning, Hybrid Retrieval, Graph Traversal, and Answer Generation.
+
+    Must be instantiated with the authenticated user's ``org_id`` so every
+    retrieval channel (hybrid search, graph, temporal) is scoped to one tenant.
+    """
 
     def __init__(
         self,
         session: AsyncSession,
         planner: QueryPlanner | None = None,
         reasoner: BaseReasoner | None = None,
+        org_id: str = "org_dev",
     ) -> None:
+        if isinstance(planner, str):
+            org_id, planner = planner, None
         self.session = session
+        self.org_id = org_id
         self.planner = planner or QueryPlanner()
         self.reasoner = reasoner or MockReasoner()
-        self.search_engine = HybridSearchEngine(session)
-        self.graph_service = GraphService(session)
-        self.temporal_engine = TemporalIntelligenceEngine(session)
+        self.search_engine = HybridSearchEngine(session, org_id=org_id)
+        self.graph_service = GraphService(session, org_id=org_id)
+        self.temporal_engine = TemporalIntelligenceEngine(session, org_id=org_id)
 
     async def answer_question(
         self,

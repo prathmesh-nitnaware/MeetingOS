@@ -82,10 +82,15 @@ class TemporalReconciliationResult(BaseModel):
 
 
 class TemporalIntelligenceEngine:
-    """Engine providing decision lifecycle tracking, slippage detection, recurring issue analysis, and timeline reconstruction."""
+    """Engine providing decision lifecycle tracking, slippage detection, recurring issue analysis, and timeline reconstruction.
 
-    def __init__(self, session: AsyncSession) -> None:
+    Must be instantiated with the authenticated user's ``org_id`` so all temporal
+    queries are scoped to a single tenant.
+    """
+
+    def __init__(self, session: AsyncSession, org_id: str = "org_dev") -> None:
         self.session = session
+        self.org_id = org_id
 
     async def reconcile_meeting_lifecycle(self, meeting_id: str) -> TemporalReconciliationResult:
         """Analyze a newly ingested meeting against prior meeting history to detect cross-meeting changes."""
@@ -346,6 +351,7 @@ class TemporalIntelligenceEngine:
         stmt = (
             select(EventModel, MeetingModel.title)
             .join(MeetingModel, MeetingModel.id == EventModel.meeting_id)
+            .where(MeetingModel.org_id == self.org_id)
             .order_by(EventModel.occurred_at.asc(), EventModel.created_at.asc())
             .limit(limit)
             .offset(offset)

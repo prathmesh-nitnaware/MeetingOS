@@ -3,6 +3,7 @@ from typing import Any, Optional
 from uuid import uuid4
 
 from sqlalchemy import (
+    Boolean,
     DateTime,
     Float,
     ForeignKey,
@@ -10,6 +11,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    UniqueConstraint,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
@@ -36,6 +38,7 @@ class MeetingModel(Base):
     __tablename__ = "meetings"
 
     id: Mapped[str] = mapped_column(String(100), primary_key=True, default=lambda: str(uuid4()))
+    org_id: Mapped[str] = mapped_column(String(64), nullable=False, default="org_dev", index=True)  # Tenant isolation key
     title: Mapped[str] = mapped_column(String(500), nullable=False)
     meeting_date: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, index=True
@@ -49,6 +52,8 @@ class MeetingModel(Base):
     metadata_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     source_provider: Mapped[str | None] = mapped_column(String(100), nullable=True, index=True)
     external_meeting_id: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
+    deleted_by: Mapped[str | None] = mapped_column(String(100), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, nullable=False
     )
@@ -457,6 +462,7 @@ class AuditLogModel(Base):
     __tablename__ = "audit_logs"
 
     id: Mapped[str] = mapped_column(String(100), primary_key=True, default=lambda: str(uuid4()))
+    org_id: Mapped[str] = mapped_column(String(64), nullable=False, default="org_dev", index=True)
     timestamp: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, nullable=False, index=True
     )
@@ -466,3 +472,134 @@ class AuditLogModel(Base):
     resource_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
     outcome: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
     metadata_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+
+    __table_args__ = (Index("ix_audit_org_timestamp", "org_id", "timestamp"),)
+
+
+class OrganizationModel(Base):
+    """Relational table representing an isolated tenant / organisation."""
+
+    __tablename__ = "organizations"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    slug: Mapped[str] = mapped_column(String(100), unique=True, nullable=False, index=True)
+    status: Mapped[str] = mapped_column(String(50), nullable=False, default="active", index=True)  # active, suspended, deleted
+    allowed_domains: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False
+    )
+
+    memberships: Mapped[list["OrganizationMembershipModel"]] = relationship(
+        "OrganizationMembershipModel", back_populates="organization", cascade="all, delete-orphan"
+    )
+    invitations: Mapped[list["OrganizationInvitationModel"]] = relationship(
+        "OrganizationInvitationModel", back_populates="organization", cascade="all, delete-orphan"
+    )
+    retention_policy: Mapped[Optional["RetentionPolicyModel"]] = relationship(
+        "RetentionPolicyModel", back_populates="organization", uselist=False, cascade="all, delete-orphan"
+    )
+
+
+class UserModel(Base):
+    """Relational table representing a user who can belong to one or more organisations."""
+
+    __tablename__ = "users"
+
+    id: Mapped[str] = mapped_column(String(100), primary_key=True, default=lambda: str(uuid4()))
+    email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
+    full_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    password_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False
+    )
+
+    memberships: Mapped[list["OrganizationMembershipModel"]] = relationship(
+        "OrganizationMembershipModel", back_populates="user", cascade="all, delete-orphan"
+    )
+
+
+class OrganizationMembershipModel(Base):
+    """Associative table linking users to organisations with RBAC role assignments."""
+
+    __tablename__ = "organization_memberships"
+
+    id: Mapped[str] = mapped_column(String(100), primary_key=True, default=lambda: str(uuid4()))
+    org_id: Mapped[str] = mapped_column(
+        String(64), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    user_id: Mapped[str] = mapped_column(
+        String(100), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    role: Mapped[str] = mapped_column(String(50), nullable=False, default="member")  # owner, admin, member, viewer
+    status: Mapped[str] = mapped_column(String(50), nullable=False, default="active")  # active, suspended
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False
+    )
+
+    organization: Mapped["OrganizationModel"] = relationship("OrganizationModel", back_populates="memberships")
+    user: Mapped["UserModel"] = relationship("UserModel", back_populates="memberships")
+
+    __table_args__ = (
+        UniqueConstraint("org_id", "user_id", name="uq_org_user_membership"),
+        Index("ix_org_membership_role", "org_id", "role"),
+    )
+
+
+class OrganizationInvitationModel(Base):
+    """Pending organization invitations for new or existing users."""
+
+    __tablename__ = "organization_invitations"
+
+    id: Mapped[str] = mapped_column(String(100), primary_key=True, default=lambda: str(uuid4()))
+    org_id: Mapped[str] = mapped_column(
+        String(64), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    email: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    role: Mapped[str] = mapped_column(String(50), nullable=False, default="member")
+    token_hash: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
+    invited_by: Mapped[str] = mapped_column(
+        String(100), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    accepted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, nullable=False
+    )
+
+    organization: Mapped["OrganizationModel"] = relationship("OrganizationModel", back_populates="invitations")
+
+
+class RetentionPolicyModel(Base):
+    """Configurable data retention policy per organisation."""
+
+    __tablename__ = "retention_policies"
+
+    id: Mapped[str] = mapped_column(String(100), primary_key=True, default=lambda: str(uuid4()))
+    org_id: Mapped[str] = mapped_column(
+        String(64), ForeignKey("organizations.id", ondelete="CASCADE"), unique=True, nullable=False, index=True
+    )
+    meeting_retention_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    audio_retention_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    transcript_retention_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    memory_retention_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    auto_delete_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False
+    )
+
+    organization: Mapped["OrganizationModel"] = relationship("OrganizationModel", back_populates="retention_policy")
+

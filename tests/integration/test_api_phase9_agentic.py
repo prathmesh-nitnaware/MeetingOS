@@ -110,6 +110,7 @@ async def test_agentic_query_unauthorized(async_client: AsyncClient):
     response = await async_client.post(
         "/api/v1/query/agentic",
         json={"question": "Why PostgreSQL?"},
+        headers={"Authorization": ""},
     )
     assert response.status_code == 401
 
@@ -147,9 +148,9 @@ async def test_security_protected_endpoints_require_auth(async_client: AsyncClie
     ]
     for method, path in protected_paths:
         if method == "GET":
-            resp = await async_client.get(path)
+            resp = await async_client.get(path, headers={"Authorization": ""})
         else:
-            resp = await async_client.post(path, json={"question": "test"})
+            resp = await async_client.post(path, json={"question": "test"}, headers={"Authorization": ""})
         assert resp.status_code == 401, (
             f"Expected 401 for unauthenticated {method} {path}, got {resp.status_code}"
         )

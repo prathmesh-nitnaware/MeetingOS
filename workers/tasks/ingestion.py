@@ -41,6 +41,7 @@ async def run_ingestion_pipeline(
     file_path_str: str,
     source_type_str: str,
     database_url: str,
+    org_id: str = "org_dev",
     asr_provider_name: str = "mock",
     diarizer_provider_name: str = "mock",
     embedder_provider_name: str = "mock",
@@ -128,7 +129,7 @@ async def run_ingestion_pipeline(
                 stage="temporal_reconciliation",
                 progress=0.95,
             )
-            temporal_engine = TemporalIntelligenceEngine(session)
+            temporal_engine = TemporalIntelligenceEngine(session, org_id=org_id)
             reconcile_res = await temporal_engine.reconcile_meeting_lifecycle(meeting_id)
 
             await repo.update_meeting_status(
@@ -177,6 +178,7 @@ def process_meeting_task(
     file_path_str: str,
     source_type_str: str,
     database_url: str,
+    org_id: str = "org_dev",
     asr_provider_name: str = "mock",
     diarizer_provider_name: str = "mock",
     embedder_provider_name: str = "mock",
@@ -190,6 +192,7 @@ def process_meeting_task(
             file_path_str=file_path_str,
             source_type_str=source_type_str,
             database_url=database_url,
+            org_id=org_id,
             asr_provider_name=asr_provider_name,
             diarizer_provider_name=diarizer_provider_name,
             embedder_provider_name=embedder_provider_name,

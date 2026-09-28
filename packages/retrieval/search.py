@@ -175,10 +175,23 @@ SYNONYMS: dict[str, list[str]] = {
 
 
 class HybridSearchEngine:
-    """Multi-channel hybrid search engine combining Lexical Search, Vector Embeddings, and Graph Relationships."""
+    """Multi-channel hybrid search engine combining Lexical Search, Vector Embeddings, and Graph Relationships.
 
-    def __init__(self, session: AsyncSession, embedder: BaseEmbedder | None = None) -> None:
+    Must be instantiated with the authenticated user's ``org_id`` so all queries
+    are scoped to a single tenant.  Tenants cannot retrieve each other's meetings,
+    transcripts, decisions, or embeddings.
+    """
+
+    def __init__(
+        self,
+        session: AsyncSession,
+        embedder: BaseEmbedder | None = None,
+        org_id: str = "org_dev",
+    ) -> None:
+        if isinstance(embedder, str):
+            org_id, embedder = embedder, None
         self.session = session
+        self.org_id = org_id
         self.embedder = embedder or MockEmbedder()
 
     async def search(
@@ -209,7 +222,7 @@ class HybridSearchEngine:
 
         candidates: list[SearchCandidate] = []
 
-        m_stmt = select(MeetingModel)
+        m_stmt = select(MeetingModel).where(MeetingModel.org_id == self.org_id)
         if meeting_id:
             m_stmt = m_stmt.where(MeetingModel.id == meeting_id)
         if start_date:

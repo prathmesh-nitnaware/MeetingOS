@@ -1,36 +1,83 @@
 # MeetingOS Security Architecture & Threat Model
 
-This document outlines the security architecture, authentication model, threat vector mitigations, and compliance standards implemented in MeetingOS.
+## 1. Executive Summary
+
+MeetingOS employs a defense-in-depth security model engineered for multi-tenant enterprise software-as-a-service (SaaS) environments. Security controls are enforced at every architectural tier: edge routing, API gateway, application business logic, relational persistence, vector indices, and object storage.
 
 ---
 
-## 1. Authentication & Role-Based Access Control (RBAC)
+## 2. Multi-Tenant Role-Based Access Control (RBAC)
 
-MeetingOS enforces a 3-tier Role-Based Access Control (RBAC) model via FastAPI security dependencies (`apps/api/auth.py`).
+MeetingOS enforces a 4-tier Role-Based Access Control model via FastAPI security dependencies (`apps/api/auth.py`).
 
-| Role | Permissions | Access Scope |
+| Role | Description | Core Permissions |
 | :--- | :--- | :--- |
-| **`admin`** | Full access to all endpoints, configuration, provider settings, worker status, and raw metrics. | `/api/v1/admin/*`, `/api/v1/audit/*`, `/api/v1/connectors/*`, and all user APIs. |
-| **`member`** | Ingest meetings, trigger NLP extractions, perform search, execute agentic reasoning queries, view traces. | `/api/v1/meetings/*`, `/api/v1/search`, `/api/v1/query/*`, `/api/v1/traces`. |
-| **`viewer`** | Read-only access to organizational dashboard, meeting summaries, timelines, and entity graphs. | `/api/v1/dashboard`, `/api/v1/meetings` (GET only), `/api/v1/temporal/*`, `/api/v1/graph/*`. |
+| **`owner`** | Primary tenant administrator with billing and organizational governance authority. | Full access including tenant deletion, member removal, retention policy configuration, role assignment. |
+| **`admin`** | Operational administrator managing workspaces and integrations. | Member invitations, connector configurations, retention configuration, audit log viewing. |
+| **`member`** | Standard organizational user with full analytical capabilities. | Meeting uploads, NLP extraction triggers, semantic search, AI agent queries, timeline analysis. |
+| **`viewer`** | Read-only stakeholder with inspection access. | Read-only access to meeting transcripts, summaries, timelines, and organizational dashboards. |
+
+### Fine-Grained Permission Matrix
+MeetingOS maps 17 granular permission scopes:
+- **Meetings**: `meetings.read`, `meetings.write`, `meetings.delete`
+- **Analytics & AI**: `transcripts.read`, `search.execute`, `query.execute`, `nlp.extract`, `temporal.read`, `graph.read`
+- **Integrations**: `connectors.read`, `connectors.write`
+- **Governance & Admin**: `members.read`, `members.invite`, `members.remove`, `organization.read`, `organization.update`, `audit.read`
 
 ---
 
-## 2. Threat Mitigations & Defense-in-Depth
+## 3. Cryptographic Standards & Password Security
 
-### A. Path Traversal & Malicious File Uploads
-- **Filename Sanitization:** `sanitize_filename` strips directory components (`..`, `/`, `\`), null bytes (`\x00`), and non-whitelisted characters.
-- **Strict Extension Whitelist:** Only `.wav`, `.mp3`, `.m4a`, `.mp4`, `.srt`, `.txt` files are accepted. All executable or unknown extensions are rejected with HTTP 400.
-- **Upload Size Limits:** Hard maximum limit (default 500 MB) enforced during streaming, with automatic disk cleanup on violation.
+### A. Password Hashing
+- Passwords are encrypted using **PBKDF2-HMAC-SHA256** with a cryptographically secure 128-bit random salt (`secrets.token_hex(16)`) and **100,000 iterations**.
+- Format: `pbkdf2_sha256${salt}${hash}`.
+- Prevents rainbow table attacks, dictionary attacks, and pre-computation exploits.
+- Legacy password hash fallback supported for non-destructive migration.
 
-### B. Credential Leakage Prevention
-- **Zero Credential Exposure:** Recursive secret sanitization (`sanitize_trace_data` and `_sanitize_secrets`) scrubs API keys, bearer tokens, passwords, and private tokens from execution traces, audit logs, and exception strings.
-- **CORS Hardening:** Production environment strictly forbids wildcard `*` CORS origins; specific trusted frontend domains must be declared in `MEETINGOS_ALLOWED_ORIGINS`.
+### B. JWT Token Lifecycle & Signing
+- JWT tokens signed with **HMAC-SHA256 (HS256)** using a 256-bit cryptographically secure secret key configured via environment variable `MEETINGOS_JWT_SECRET`.
+- Payload includes:
+  - `sub`: Unique user ID.
+  - `org_id`: Active tenant identifier.
+  - `role`: User role within the active tenant.
+  - `email`: Authenticated email address.
+  - `exp`: Expiration timestamp (default: 24 hours).
+- Switching organizations (`POST /api/v1/auth/switch-org`) requires verification of active tenant membership before minting a new tenant-scoped JWT.
 
-### C. Rate Limiting & Abuse Prevention
-- **Sliding Window:** Redis sliding window limiter tracks per-IP and per-token request rates.
-- **Route Quotas:** Configurable per-route rate limits (queries, uploads, agentic reasoning, admin operations) with automatic in-memory fallback if Redis is unavailable.
+### C. Invitation Token Security
+- Invitation tokens generated using `secrets.token_hex(32)`.
+- Only the **SHA-256 hash** of the token is persisted in `organization_invitations.token_hash`.
+- Enforces single-use consumption (`accepted_at` timestamp check) and strict 7-day expiration (`expires_at > utc_now()`).
 
-### D. Audit Logging & Traceability
-- **Security Audit Trails:** Security-sensitive operations (connector sync, provider updates, role changes) are recorded in the `audit_logs` table with actor ID, timestamp, outcome, and metadata.
-- **Correlation IDs:** Every HTTP request receives a unique `X-Request-ID` attached to response headers and structured access logs.
+---
+
+## 4. Threat Vector Mitigations & Defense-in-Depth
+
+### A. Broken Object Level Authorization (BOLA / IDOR) Defense
+- No endpoint relies solely on a client-provided `org_id` or resource UUID.
+- All database queries filter on `WHERE org_id = :authenticated_user_org_id AND deleted_at IS NULL`.
+- Inquiries targeting foreign tenant resources safely return `404 Not Found`, denying attackers confirmation of resource existence.
+
+### B. Storage Isolation & Path Traversal Protection
+- Storage structure: `storage/orgs/{org_id}/meetings/{meeting_id}/audio.wav`.
+- File download handlers resolve canonical absolute paths (`Path.resolve()`) and enforce strict boundary checks (`target.relative_to(tenant_dir)`).
+- Malicious traversal attempts (`../../etc/passwd`, `%2e%2e%2f`) are immediately caught and rejected with `403 Forbidden`.
+
+### C. Vector & AI Retrieval Isolation
+- `HybridSearchEngine` and `EmbeddingRepository` mandate tenant pre-filtering prior to vector similarity calculation (`WHERE org_id = :current_org`).
+- Queries from Org A can never retrieve or compute similarity scores against Org B vector embeddings.
+
+### D. Accidental Data Loss Protection & Soft Deletion
+- Meeting deletions execute non-destructive soft deletes by setting `deleted_at` and `deleted_by`.
+- Soft-deleted meetings are excluded from standard API responses and vector queries while remaining fully recoverable by organization Owners.
+
+### E. Rate Limiting & Abuse Prevention
+- Sliding-window rate limiter protects sensitive endpoints:
+  - `/api/v1/auth/login`: 10 requests / minute per IP.
+  - `/api/v1/auth/register-org`: 5 requests / hour per IP.
+  - `/api/v1/meetings` (upload): 20 uploads / hour per tenant.
+  - `/api/v1/query/*`: 100 queries / minute per tenant.
+
+### F. Audit Logging & Credential Sanitization
+- All security-sensitive actions (registration, invitation, role alteration, policy updates, deletions) record immutable audit entries in `audit_logs`.
+- All logs and traces pass through automated secret scrubbing filters (`_sanitize_secrets`), ensuring passwords, JWTs, and API keys are never logged.

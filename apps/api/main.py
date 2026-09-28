@@ -6,6 +6,7 @@ from apps.api.config import settings
 from apps.api.middleware.logging import StructuredLoggingMiddleware
 from apps.api.routers.admin import router as admin_router
 from apps.api.routers.audit import router as audit_router
+from apps.api.routers.auth import router as auth_router
 from apps.api.routers.connectors import router as connectors_router
 from apps.api.routers.dashboard import router as dashboard_router
 from apps.api.routers.entities import router as entities_router
@@ -14,6 +15,7 @@ from apps.api.routers.health import router as health_router
 from apps.api.routers.jobs import router as jobs_router
 from apps.api.routers.meetings import router as meetings_router
 from apps.api.routers.metrics import router as metrics_router
+from apps.api.routers.organizations import router as organizations_router
 from apps.api.routers.query import router as query_router
 from apps.api.routers.search import router as search_router
 from apps.api.routers.temporal import router as temporal_router
@@ -71,6 +73,8 @@ def create_app() -> FastAPI:
 
     # Register Routers under /api/v1
     app.include_router(health_router, prefix=settings.api_v1_prefix)
+    app.include_router(auth_router, prefix=settings.api_v1_prefix)
+    app.include_router(organizations_router, prefix=settings.api_v1_prefix)
     app.include_router(meetings_router, prefix=settings.api_v1_prefix)
     app.include_router(jobs_router, prefix=settings.api_v1_prefix)
     app.include_router(search_router, prefix=settings.api_v1_prefix)

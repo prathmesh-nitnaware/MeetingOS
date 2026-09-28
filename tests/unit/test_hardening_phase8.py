@@ -284,7 +284,7 @@ async def test_ingestion_idempotency():
 @pytest.mark.asyncio
 async def test_api_security_boundary(async_client: AsyncClient):
     # 1. Unauthenticated request rejected
-    res = await async_client.get("/api/v1/connectors")
+    res = await async_client.get("/api/v1/connectors", headers={"Authorization": ""})
     assert res.status_code == 401
 
     # 2. Invalid token rejected

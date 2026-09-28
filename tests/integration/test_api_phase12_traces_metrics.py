@@ -53,5 +53,5 @@ async def test_traces_and_metrics_endpoints(async_client: AsyncClient):
     assert "secret" not in str(status_data)
 
     # 6. Test 401 Unauthorized
-    res_unauth = await async_client.get("/api/v1/query/traces")
+    res_unauth = await async_client.get("/api/v1/query/traces", headers={"Authorization": ""})
     assert res_unauth.status_code == 401

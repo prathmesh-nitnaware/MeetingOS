@@ -1,7 +1,8 @@
 from typing import Annotated
 
+from apps.api.auth import UserIdentity, require_viewer
 from apps.api.config import settings
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from packages.common.enums import EntityType
 from packages.memory.database import get_db_session
 from packages.memory.graph import EntityDetailResponse, GraphNode, GraphService
@@ -15,10 +16,11 @@ async def list_canonical_entities(
     entity_type: Annotated[EntityType | None, Query(description="Filter by entity type")] = None,
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
     offset: Annotated[int, Query(ge=0)] = 0,
+    user: UserIdentity = Depends(require_viewer),
 ) -> list[GraphNode]:
-    """List canonical entities tracked across meetings with their presence counts."""
+    """List canonical entities tracked across the organisation's meetings with their presence counts."""
     async with get_db_session(settings.database_url) as session:
-        service = GraphService(session)
+        service = GraphService(session, org_id=user.org_id)
         return await service.list_canonical_entities(
             entity_type=entity_type,
             limit=limit,
@@ -29,10 +31,11 @@ async def list_canonical_entities(
 @router.get("/{entity_id}", response_model=EntityDetailResponse)
 async def get_canonical_entity(
     entity_id: str,
+    user: UserIdentity = Depends(require_viewer),
 ) -> EntityDetailResponse:
     """Get full details, meeting occurrences, and connections for a canonical entity."""
     async with get_db_session(settings.database_url) as session:
-        service = GraphService(session)
+        service = GraphService(session, org_id=user.org_id)
         detail = await service.get_entity_detail(entity_id)
         if not detail:
             raise HTTPException(
@@ -45,8 +48,9 @@ async def get_canonical_entity(
 @router.get("/{entity_id}/timeline", response_model=EntityTimelineResponse)
 async def get_entity_timeline(
     entity_id: str,
+    user: UserIdentity = Depends(require_viewer),
 ) -> EntityTimelineResponse:
     """Retrieve full chronological stream of events, decisions, actions, and issues for an entity."""
     async with get_db_session(settings.database_url) as session:
-        engine = TemporalIntelligenceEngine(session)
+        engine = TemporalIntelligenceEngine(session, org_id=user.org_id)
         return await engine.reconstruct_entity_timeline(entity_id)

@@ -15,13 +15,13 @@ async def get_audit_logs(
     action: str | None = None,
     limit: int = Query(default=50, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
-    _user: UserIdentity = Depends(require_admin),
+    user: UserIdentity = Depends(require_admin),
 ) -> list[dict[str, Any]]:
     """Retrieve security-sensitive actions audit logs. Available to administrators only."""
     async with get_db_session(settings.database_url) as session:
         repo = MeetingRepository(session)
         logs = await repo.get_audit_logs(
-            actor_id=actor_id, action=action, limit=limit, offset=offset
+            org_id=user.org_id, actor_id=actor_id, action=action, limit=limit, offset=offset
         )
         return [
             {

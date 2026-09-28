@@ -3,11 +3,13 @@ import json
 import logging
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Any
 from uuid import uuid4
 
+from apps.api.auth import UserIdentity, require_member, require_viewer
 from apps.api.config import settings
-from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
+from fastapi.responses import FileResponse
 from packages.common.enums import ProcessingStatus, SourceType
 from packages.common.models import (
     ExtractedCommitment,
@@ -96,6 +98,7 @@ async def create_and_upload_meeting(
     meeting_date: Annotated[str | None, Form()] = None,
     participants: Annotated[str | None, Form()] = None,
     async_processing: Annotated[bool, Form()] = False,
+    user: UserIdentity = Depends(require_member),
 ) -> MeetingCreateResponse:
     """Upload a meeting audio/video/text file, create a meeting record, and trigger ingestion."""
     if not file.filename:
@@ -139,10 +142,12 @@ async def create_and_upload_meeting(
                 status_code=400, detail=f"Invalid participants JSON format: {exc}"
             ) from exc
 
-    # Save uploaded file
+    # Save uploaded file in tenant-scoped directory
     storage_dir = Path(settings.upload_storage_dir)
     file_ext = Path(file.filename).suffix.lower()
-    dest_path = storage_dir / f"{meeting_id}{file_ext}"
+    tenant_meeting_dir = storage_dir / "orgs" / user.org_id / "meetings" / meeting_id
+    tenant_meeting_dir.mkdir(parents=True, exist_ok=True)
+    dest_path = tenant_meeting_dir / f"audio{file_ext}"
 
     try:
         file_size = save_upload_file(file.file, dest_path, max_size_mb=settings.max_upload_size_mb)
@@ -163,10 +168,10 @@ async def create_and_upload_meeting(
         ),
     )
 
-    # Persist meeting and job in DB
+    # Persist meeting and job in DB — scoped to the authenticated user's org
     async with get_db_session(settings.database_url) as session:
         repo = MeetingRepository(session)
-        await repo.create_meeting(meeting)
+        await repo.create_meeting(meeting, org_id=user.org_id)
         await repo.create_job(job_id=job_id, meeting_id=meeting_id, stage="queued")
 
     # Ingestion execution
@@ -179,6 +184,7 @@ async def create_and_upload_meeting(
                 file_path_str=str(dest_path),
                 source_type_str=str(source_type),
                 database_url=settings.database_url,
+                org_id=user.org_id,
                 asr_provider_name=settings.asr_provider,
                 diarizer_provider_name=settings.diarizer_provider,
             )
@@ -192,6 +198,7 @@ async def create_and_upload_meeting(
             file_path_str=str(dest_path),
             source_type_str=str(source_type),
             database_url=settings.database_url,
+            org_id=user.org_id,
             asr_provider_name=settings.asr_provider,
             diarizer_provider_name=settings.diarizer_provider,
         )
@@ -210,11 +217,12 @@ async def create_and_upload_meeting(
 async def list_meetings(
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
     offset: Annotated[int, Query(ge=0)] = 0,
+    user: UserIdentity = Depends(require_viewer),
 ) -> list[MeetingSummaryResponse]:
-    """List all ingested meetings ordered by date descending."""
+    """List all ingested meetings for the authenticated organisation ordered by date descending."""
     async with get_db_session(settings.database_url) as session:
         repo = MeetingRepository(session)
-        meetings = await repo.list_meetings(limit=limit, offset=offset)
+        meetings = await repo.list_meetings(org_id=user.org_id, limit=limit, offset=offset)
 
     return [
         MeetingSummaryResponse(
@@ -233,11 +241,14 @@ async def list_meetings(
 
 
 @router.get("/{meeting_id}", response_model=MeetingDetailResponse)
-async def get_meeting_detail(meeting_id: str) -> MeetingDetailResponse:
+async def get_meeting_detail(
+    meeting_id: str,
+    user: UserIdentity = Depends(require_viewer),
+) -> MeetingDetailResponse:
     """Get full metadata, processing status, and participants for a specific meeting."""
     async with get_db_session(settings.database_url) as session:
         repo = MeetingRepository(session)
-        meeting = await repo.get_meeting(meeting_id)
+        meeting = await repo.get_meeting(meeting_id, org_id=user.org_id)
 
     if not meeting:
         raise HTTPException(
@@ -261,12 +272,86 @@ async def get_meeting_detail(meeting_id: str) -> MeetingDetailResponse:
     )
 
 
+@router.delete("/{meeting_id}", response_model=dict[str, Any])
+async def delete_meeting(
+    meeting_id: str,
+    hard_delete: bool = Query(default=False, description="Permanently delete rather than soft-deleting"),
+    user: UserIdentity = Depends(require_member),
+) -> dict[str, Any]:
+    """Delete a meeting. Defaults to soft deletion for safety and recovery."""
+    async with get_db_session(settings.database_url) as session:
+        repo = MeetingRepository(session)
+        if hard_delete:
+            success = await repo.hard_delete_meeting(meeting_id=meeting_id, org_id=user.org_id)
+        else:
+            success = await repo.soft_delete_meeting(
+                meeting_id=meeting_id, actor_id=user.user_id, org_id=user.org_id
+            )
+
+        if not success:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Meeting with ID '{meeting_id}' not found.",
+            )
+        await session.commit()
+        return {
+            "status": "succeeded",
+            "meeting_id": meeting_id,
+            "deletion_type": "hard_delete" if hard_delete else "soft_delete",
+        }
+
+
+@router.get("/{meeting_id}/audio")
+async def get_meeting_audio(
+    meeting_id: str,
+    user: UserIdentity = Depends(require_viewer),
+) -> FileResponse:
+    """Download or stream the audio file for a meeting, strictly scoped to the tenant organization."""
+    async with get_db_session(settings.database_url) as session:
+        repo = MeetingRepository(session)
+        meeting = await repo.get_meeting(meeting_id=meeting_id, org_id=user.org_id)
+        if not meeting:
+            raise HTTPException(status_code=404, detail=f"Meeting '{meeting_id}' not found.")
+
+    storage_base = Path(settings.upload_storage_dir).resolve()
+    tenant_dir = (storage_base / "orgs" / user.org_id / "meetings" / meeting_id).resolve()
+
+    # Path traversal defense: ensure resolved path is strictly within storage_base and tenant_dir
+    try:
+        tenant_dir.relative_to(storage_base)
+    except ValueError:
+        raise HTTPException(status_code=403, detail="Access denied: invalid storage path traversal.")
+
+    if not tenant_dir.exists() or not tenant_dir.is_dir():
+        raise HTTPException(status_code=404, detail="Audio file not found on storage.")
+
+    audio_files = list(tenant_dir.glob("audio.*"))
+    if not audio_files:
+        raise HTTPException(status_code=404, detail="Audio file not found.")
+
+    target_file = audio_files[0].resolve()
+    try:
+        target_file.relative_to(tenant_dir)
+    except ValueError:
+        raise HTTPException(status_code=403, detail="Path traversal attempt detected.")
+
+    return FileResponse(
+        path=target_file,
+        media_type="audio/wav",
+        filename=f"{meeting.title or meeting_id}.wav",
+    )
+
+
+
 @router.get("/{meeting_id}/transcript", response_model=TranscriptResponse)
-async def get_meeting_transcript(meeting_id: str) -> TranscriptResponse:
+async def get_meeting_transcript(
+    meeting_id: str,
+    user: UserIdentity = Depends(require_viewer),
+) -> TranscriptResponse:
     """Get all timestamped transcript segments for a meeting ordered by sequence."""
     async with get_db_session(settings.database_url) as session:
         repo = MeetingRepository(session)
-        meeting = await repo.get_meeting(meeting_id)
+        meeting = await repo.get_meeting(meeting_id, org_id=user.org_id)
         if not meeting:
             raise HTTPException(
                 status_code=404,
@@ -287,88 +372,112 @@ async def get_meeting_transcript(meeting_id: str) -> TranscriptResponse:
 
 
 @router.get("/{meeting_id}/entities", response_model=list[ExtractedEntity])
-async def get_meeting_entities(meeting_id: str) -> list[ExtractedEntity]:
+async def get_meeting_entities(
+    meeting_id: str,
+    user: UserIdentity = Depends(require_viewer),
+) -> list[ExtractedEntity]:
     """Retrieve all named and domain entities extracted from the meeting."""
     async with get_db_session(settings.database_url) as session:
         repo = MeetingRepository(session)
-        meeting = await repo.get_meeting(meeting_id)
+        meeting = await repo.get_meeting(meeting_id, org_id=user.org_id)
         if not meeting:
             raise HTTPException(status_code=404, detail=f"Meeting '{meeting_id}' not found.")
         return await repo.get_meeting_entities(meeting_id)
 
 
 @router.get("/{meeting_id}/topics", response_model=list[str])
-async def get_meeting_topics(meeting_id: str) -> list[str]:
+async def get_meeting_topics(
+    meeting_id: str,
+    user: UserIdentity = Depends(require_viewer),
+) -> list[str]:
     """Retrieve discussion topics extracted from the meeting."""
     async with get_db_session(settings.database_url) as session:
         repo = MeetingRepository(session)
-        meeting = await repo.get_meeting(meeting_id)
+        meeting = await repo.get_meeting(meeting_id, org_id=user.org_id)
         if not meeting:
             raise HTTPException(status_code=404, detail=f"Meeting '{meeting_id}' not found.")
         return await repo.get_meeting_topics(meeting_id)
 
 
 @router.get("/{meeting_id}/decisions", response_model=list[ExtractedDecision])
-async def get_meeting_decisions(meeting_id: str) -> list[ExtractedDecision]:
+async def get_meeting_decisions(
+    meeting_id: str,
+    user: UserIdentity = Depends(require_viewer),
+) -> list[ExtractedDecision]:
     """Retrieve decisions extracted from the meeting."""
     async with get_db_session(settings.database_url) as session:
         repo = MeetingRepository(session)
-        meeting = await repo.get_meeting(meeting_id)
+        meeting = await repo.get_meeting(meeting_id, org_id=user.org_id)
         if not meeting:
             raise HTTPException(status_code=404, detail=f"Meeting '{meeting_id}' not found.")
         return await repo.get_meeting_decisions(meeting_id)
 
 
 @router.get("/{meeting_id}/actions", response_model=list[ExtractedCommitment])
-async def get_meeting_actions(meeting_id: str) -> list[ExtractedCommitment]:
+async def get_meeting_actions(
+    meeting_id: str,
+    user: UserIdentity = Depends(require_viewer),
+) -> list[ExtractedCommitment]:
     """Retrieve action items and commitments extracted from the meeting."""
     async with get_db_session(settings.database_url) as session:
         repo = MeetingRepository(session)
-        meeting = await repo.get_meeting(meeting_id)
+        meeting = await repo.get_meeting(meeting_id, org_id=user.org_id)
         if not meeting:
             raise HTTPException(status_code=404, detail=f"Meeting '{meeting_id}' not found.")
         return await repo.get_meeting_actions(meeting_id)
 
 
 @router.get("/{meeting_id}/issues", response_model=list[ExtractedIssue])
-async def get_meeting_issues(meeting_id: str) -> list[ExtractedIssue]:
+async def get_meeting_issues(
+    meeting_id: str,
+    user: UserIdentity = Depends(require_viewer),
+) -> list[ExtractedIssue]:
     """Retrieve issues and problems extracted from the meeting."""
     async with get_db_session(settings.database_url) as session:
         repo = MeetingRepository(session)
-        meeting = await repo.get_meeting(meeting_id)
+        meeting = await repo.get_meeting(meeting_id, org_id=user.org_id)
         if not meeting:
             raise HTTPException(status_code=404, detail=f"Meeting '{meeting_id}' not found.")
         return await repo.get_meeting_issues(meeting_id)
 
 
 @router.get("/{meeting_id}/timeline", response_model=list[ExtractedEvent])
-async def get_meeting_timeline(meeting_id: str) -> list[ExtractedEvent]:
+async def get_meeting_timeline(
+    meeting_id: str,
+    user: UserIdentity = Depends(require_viewer),
+) -> list[ExtractedEvent]:
     """Retrieve chronological lifecycle events extracted from the meeting."""
     async with get_db_session(settings.database_url) as session:
         repo = MeetingRepository(session)
-        meeting = await repo.get_meeting(meeting_id)
+        meeting = await repo.get_meeting(meeting_id, org_id=user.org_id)
         if not meeting:
             raise HTTPException(status_code=404, detail=f"Meeting '{meeting_id}' not found.")
         return await repo.get_meeting_timeline(meeting_id)
 
 
 @router.get("/{meeting_id}/relations", response_model=list[ExtractedRelation])
-async def get_meeting_relations(meeting_id: str) -> list[ExtractedRelation]:
+async def get_meeting_relations(
+    meeting_id: str,
+    user: UserIdentity = Depends(require_viewer),
+) -> list[ExtractedRelation]:
     """Retrieve typed relations between entities extracted from the meeting."""
     async with get_db_session(settings.database_url) as session:
         repo = MeetingRepository(session)
-        meeting = await repo.get_meeting(meeting_id)
+        meeting = await repo.get_meeting(meeting_id, org_id=user.org_id)
         if not meeting:
             raise HTTPException(status_code=404, detail=f"Meeting '{meeting_id}' not found.")
         return await repo.get_meeting_relations(meeting_id)
 
 
 @router.post("/{meeting_id}/extract", response_model=ExtractionResponse)
-async def trigger_nlp_extraction(meeting_id: str) -> ExtractionResponse:
+async def trigger_nlp_extraction(
+    meeting_id: str,
+    user: UserIdentity = Depends(require_member),
+) -> ExtractionResponse:
     """Trigger on-demand NLP extraction on existing transcript segments."""
     async with get_db_session(settings.database_url) as session:
         repo = MeetingRepository(session)
-        meeting = await repo.get_meeting(meeting_id)
+        meeting = await repo.get_meeting(meeting_id, org_id=user.org_id)
         if not meeting:
             raise HTTPException(status_code=404, detail=f"Meeting '{meeting_id}' not found.")
         segments = await repo.get_transcript_segments(meeting_id)
@@ -399,3 +508,4 @@ async def trigger_nlp_extraction(meeting_id: str) -> ExtractionResponse:
         events_count=len(results.events),
         relations_count=len(results.relations),
     )
+

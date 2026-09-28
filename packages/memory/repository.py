@@ -58,15 +58,26 @@ async def init_db(engine: AsyncEngine) -> None:
 
 
 class MeetingRepository:
-    """Repository managing persistence and retrieval of CMF meetings, transcripts, NLP facts, and jobs."""
+    """Repository managing persistence and retrieval of CMF meetings, transcripts, NLP facts, and jobs.
+
+    Every public method that queries meetings or related data accepts an ``org_id``
+    parameter and applies it as a WHERE clause so that tenants never see each
+    other's data.  Callers MUST pass the org_id obtained from the authenticated
+    ``UserIdentity`` — never hard-code or default it.
+    """
 
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
-    async def create_meeting(self, meeting: Meeting) -> MeetingModel:
-        """Persist a new Meeting with participants, speakers, and segments in an atomic transaction."""
+    async def create_meeting(self, meeting: Meeting, org_id: str = "org_dev") -> MeetingModel:
+        """Persist a new Meeting with participants, speakers, and segments in an atomic transaction.
+
+        The ``org_id`` is stored on the meeting row and all subsequent read
+        operations will filter on it to guarantee tenant isolation.
+        """
         meeting_row = MeetingModel(
             id=meeting.meeting_id,
+            org_id=org_id,
             title=meeting.title,
             meeting_date=meeting.meeting_date,
             duration_seconds=meeting.duration_seconds,
@@ -118,11 +129,19 @@ class MeetingRepository:
         await self.session.flush()
         return meeting_row
 
-    async def get_meeting(self, meeting_id: str) -> Meeting | None:
-        """Fetch a Meeting by ID with all participants, speakers, and ordered segments as CMF."""
+    async def get_meeting(self, meeting_id: str, org_id: str = "org_dev") -> Meeting | None:
+        """Fetch a Meeting by ID scoped to the requesting organisation.
+
+        Returns ``None`` (not an error) when the meeting exists in the database
+        but belongs to a different tenant or is soft-deleted — this prevents cross-org enumeration.
+        """
         stmt = (
             select(MeetingModel)
-            .where(MeetingModel.id == meeting_id)
+            .where(
+                MeetingModel.id == meeting_id,
+                MeetingModel.org_id == org_id,
+                MeetingModel.deleted_at.is_(None),
+            )
             .options(
                 selectinload(MeetingModel.participants),
                 selectinload(MeetingModel.speakers),
@@ -174,10 +193,13 @@ class MeetingRepository:
             updated_at=meeting_row.updated_at,
         )
 
-    async def list_meetings(self, limit: int = 50, offset: int = 0) -> list[Meeting]:
-        """List meetings ordered by date descending."""
+    async def list_meetings(
+        self, org_id: str = "org_dev", limit: int = 50, offset: int = 0
+    ) -> list[Meeting]:
+        """List meetings for a specific organisation ordered by date descending."""
         stmt = (
             select(MeetingModel)
+            .where(MeetingModel.org_id == org_id, MeetingModel.deleted_at.is_(None))
             .options(
                 selectinload(MeetingModel.participants),
                 selectinload(MeetingModel.speakers),
@@ -250,9 +272,12 @@ class MeetingRepository:
         )
 
         for seg in segments:
+            seg_id = seg.segment_id
+            if not seg_id.startswith(f"{meeting_id}-"):
+                seg_id = f"{meeting_id}-{seg_id}"
             self.session.add(
                 TranscriptSegmentModel(
-                    id=seg.segment_id,
+                    id=seg_id,
                     meeting_id=meeting_id,
                     sequence=seg.sequence,
                     speaker_id=seg.speaker_id,
@@ -730,6 +755,55 @@ class MeetingRepository:
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none()
 
+    async def soft_delete_meeting(
+        self, meeting_id: str, actor_id: str, org_id: str = "org_dev"
+    ) -> bool:
+        """Mark a meeting as soft-deleted without destroying underlying database records."""
+        from datetime import UTC, datetime
+
+        stmt = select(MeetingModel).where(
+            MeetingModel.id == meeting_id,
+            MeetingModel.org_id == org_id,
+            MeetingModel.deleted_at.is_(None),
+        )
+        result = await self.session.execute(stmt)
+        meeting = result.scalar_one_or_none()
+        if not meeting:
+            return False
+
+        meeting.deleted_at = datetime.now(UTC)
+        meeting.deleted_by = actor_id
+
+        # Record audit log
+        self.session.add(
+            AuditLogModel(
+                org_id=org_id,
+                actor_id=actor_id,
+                action="meeting.deleted",
+                resource_type="meeting",
+                resource_id=meeting_id,
+                outcome="succeeded",
+                metadata_json={"soft_delete": True, "title": meeting.title},
+            )
+        )
+        await self.session.flush()
+        return True
+
+    async def hard_delete_meeting(self, meeting_id: str, org_id: str = "org_dev") -> bool:
+        """Permanently remove a meeting and all cascading child records for a tenant."""
+        stmt = select(MeetingModel).where(
+            MeetingModel.id == meeting_id,
+            MeetingModel.org_id == org_id,
+        )
+        result = await self.session.execute(stmt)
+        meeting = result.scalar_one_or_none()
+        if not meeting:
+            return False
+
+        await self.session.delete(meeting)
+        await self.session.flush()
+        return True
+
     async def create_audit_log(
         self,
         actor_id: str,
@@ -737,10 +811,12 @@ class MeetingRepository:
         resource_type: str,
         resource_id: str | None,
         outcome: str,
+        org_id: str = "org_dev",
         metadata_json: dict[str, Any] | None = None,
     ) -> AuditLogModel:
-        """Create and persist a security-sensitive operations audit log entry."""
+        """Create and persist a security-sensitive operations audit log entry scoped to an organisation."""
         log = AuditLogModel(
+            org_id=org_id,
             actor_id=actor_id,
             action=action,
             resource_type=resource_type,
@@ -754,13 +830,14 @@ class MeetingRepository:
 
     async def get_audit_logs(
         self,
+        org_id: str = "org_dev",
         actor_id: str | None = None,
         action: str | None = None,
         limit: int = 50,
         offset: int = 0,
     ) -> list[AuditLogModel]:
-        """Fetch audit log entries ordered by timestamp descending."""
-        stmt = select(AuditLogModel)
+        """Fetch audit log entries for a specific organisation ordered by timestamp descending."""
+        stmt = select(AuditLogModel).where(AuditLogModel.org_id == org_id)
         if actor_id:
             stmt = stmt.where(AuditLogModel.actor_id == actor_id)
         if action:

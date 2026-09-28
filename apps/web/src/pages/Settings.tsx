@@ -127,33 +127,58 @@ export const Settings: React.FC = () => {
               Select a development token to configure your current authorization role.
             </p>
             <div style={{ display: "flex", flexDirection: "column", gap: "0.8rem" }}>
+              <div style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--accent-color, #3b82f6)", marginTop: "0.2rem" }}>
+                ORGANIZATION A (Development Workspace - org_dev)
+              </div>
               <button
                 className={`timeline-btn ${token === "admin-secret-token" ? "btn-primary" : "btn-secondary"}`}
                 onClick={() => handleSaveToken("admin-secret-token")}
                 style={{ textAlign: "left", justifyContent: "flex-start" }}
               >
-                Administrator Role (Full access)
+                Org A: Admin Role (Full Access)
               </button>
               <button
                 className={`timeline-btn ${token === "member-secret-token" ? "btn-primary" : "btn-secondary"}`}
                 onClick={() => handleSaveToken("member-secret-token")}
                 style={{ textAlign: "left", justifyContent: "flex-start" }}
               >
-                Member Role (Upload, Query, Read)
+                Org A: Member Role (Upload, Query, Read)
               </button>
               <button
                 className={`timeline-btn ${token === "viewer-secret-token" ? "btn-primary" : "btn-secondary"}`}
                 onClick={() => handleSaveToken("viewer-secret-token")}
                 style={{ textAlign: "left", justifyContent: "flex-start" }}
               >
-                Viewer Role (Read-only views)
+                Org A: Viewer Role (Read-only)
               </button>
+
+              <div style={{ fontSize: "0.8rem", fontWeight: 600, color: "#10b981", marginTop: "0.6rem" }}>
+                ORGANIZATION B (BetaCorp Tenant - org_beta)
+              </div>
+              <button
+                className={`timeline-btn ${token === "admin-beta-token" ? "btn-primary" : "btn-secondary"}`}
+                onClick={() => handleSaveToken("admin-beta-token")}
+                style={{ textAlign: "left", justifyContent: "flex-start" }}
+              >
+                Org B: Admin Role (BetaCorp Workspace)
+              </button>
+              <button
+                className={`timeline-btn ${token === "member-beta-token" ? "btn-primary" : "btn-secondary"}`}
+                onClick={() => handleSaveToken("member-beta-token")}
+                style={{ textAlign: "left", justifyContent: "flex-start" }}
+              >
+                Org B: Member Role (BetaCorp Workspace)
+              </button>
+
+              <div style={{ fontSize: "0.8rem", fontWeight: 600, color: "#ef4444", marginTop: "0.6rem" }}>
+                UNAUTHENTICATED / ANONYMOUS
+              </div>
               <button
                 className={`timeline-btn ${!token ? "btn-primary" : "btn-secondary"}`}
                 onClick={() => handleSaveToken("")}
                 style={{ textAlign: "left", justifyContent: "flex-start" }}
               >
-                Anonymous Role (Unauthorized)
+                Anonymous (Unauthorized 401)
               </button>
             </div>
             

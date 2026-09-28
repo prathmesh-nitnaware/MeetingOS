@@ -14,14 +14,26 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 
 class AgentOrchestrator:
-    """Central controller managing query classification, specialist routing, evidence checks, answer synthesis, and trace persistence."""
+    """Central controller managing query classification, specialist routing, evidence checks, answer synthesis, and trace persistence.
 
-    def __init__(self, session: AsyncSession, reasoner: BaseReasoner | None = None) -> None:
+    Must be instantiated with the authenticated user's ``org_id`` so all agents
+    operate within a single tenant's data boundary.
+    """
+
+    def __init__(
+        self,
+        session: AsyncSession,
+        reasoner: BaseReasoner | None = None,
+        org_id: str = "org_dev",
+    ) -> None:
+        if isinstance(reasoner, str):
+            org_id, reasoner = reasoner, None
         self.session = session
+        self.org_id = org_id
         self.planner_agent = PlannerAgent()
-        self.retrieval_agent = RetrievalAgent(session)
-        self.temporal_agent = TemporalAgent(session)
-        self.graph_agent = GraphAgent(session)
+        self.retrieval_agent = RetrievalAgent(session, org_id=org_id)
+        self.temporal_agent = TemporalAgent(session, org_id=org_id)
+        self.graph_agent = GraphAgent(session, org_id=org_id)
         self.evidence_agent = EvidenceAgent()
         self.answer_agent = AnswerAgent(reasoner)
 

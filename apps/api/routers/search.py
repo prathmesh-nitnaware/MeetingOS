@@ -1,8 +1,9 @@
 from datetime import datetime
 from typing import Annotated
 
+from apps.api.auth import UserIdentity, require_viewer
 from apps.api.config import settings
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Depends, Query
 from packages.memory.database import get_db_session
 from packages.retrieval.search import HybridSearchEngine, SearchResponse
 
@@ -25,10 +26,11 @@ async def search_organizational_memory(
     ] = None,
     limit: Annotated[int, Query(ge=1, le=100)] = 20,
     offset: Annotated[int, Query(ge=0)] = 0,
+    user: UserIdentity = Depends(require_viewer),
 ) -> SearchResponse:
-    """Multi-channel hybrid search across organizational memory (lexical keyword + semantic vector embeddings)."""
+    """Multi-channel hybrid search across organisational memory (lexical keyword + semantic vector embeddings)."""
     async with get_db_session(settings.database_url) as session:
-        engine = HybridSearchEngine(session)
+        engine = HybridSearchEngine(session, org_id=user.org_id)
         return await engine.search(
             query=q,
             meeting_id=meeting_id,

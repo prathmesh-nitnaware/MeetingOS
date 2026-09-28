@@ -9,8 +9,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 class GraphAgent(BaseAgent):
     """Graph Agent that resolves multi-hop entity neighborhoods and relation pathways using GraphService."""
 
-    def __init__(self, session: AsyncSession) -> None:
-        self.graph_service = GraphService(session)
+    def __init__(self, session: AsyncSession, org_id: str = "org_dev") -> None:
+        self.graph_service = GraphService(session, org_id=org_id)
 
     async def run(self, context: AgentContext) -> AgentContext:
         start_time = time.perf_counter()

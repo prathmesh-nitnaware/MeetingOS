@@ -1,7 +1,8 @@
 from typing import Annotated
 
+from apps.api.auth import UserIdentity, require_viewer
 from apps.api.config import settings
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from packages.common.enums import RelationType
 from packages.memory.database import get_db_session
 from packages.memory.graph import EntityDetailResponse, GraphService, SubgraphResponse
@@ -12,15 +13,16 @@ router = APIRouter(prefix="/graph", tags=["Knowledge Graph"])
 @router.get("/entities/{entity_id}", response_model=EntityDetailResponse)
 async def get_entity_graph(
     entity_id: str,
+    user: UserIdentity = Depends(require_viewer),
 ) -> EntityDetailResponse:
     """Retrieve an entity's direct connected graph, relationships, and cross-meeting history."""
     async with get_db_session(settings.database_url) as session:
-        service = GraphService(session)
+        service = GraphService(session, org_id=user.org_id)
         detail = await service.get_entity_detail(entity_id)
         if not detail:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Entity with ID '{entity_id}' not found in organizational memory",
+                detail=f"Entity with ID '{entity_id}' not found in organisational memory",
             )
         return detail
 
@@ -37,10 +39,11 @@ async def get_subgraph(
         Query(description="Filter by relationship types"),
     ] = None,
     limit: Annotated[int, Query(ge=1, le=500)] = 100,
+    user: UserIdentity = Depends(require_viewer),
 ) -> SubgraphResponse:
-    """Extract a connected multi-hop subgraph linking entities across organizational meetings."""
+    """Extract a connected multi-hop subgraph linking entities across the organisation's meetings."""
     async with get_db_session(settings.database_url) as session:
-        service = GraphService(session)
+        service = GraphService(session, org_id=user.org_id)
         return await service.get_subgraph(
             entity_id=entity,
             depth=depth,

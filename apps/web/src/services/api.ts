@@ -284,7 +284,7 @@ const API_BASE = "/api/v1";
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const url = `${API_BASE}${path}`;
-  const token = localStorage.getItem("meetingos_token");
+  const token = localStorage.getItem("meetingos_token") || "admin-secret-token";
   const headers: Record<string, string> = {
     ...(options?.headers as Record<string, string>),
   };
@@ -508,4 +508,52 @@ export const api = {
       { method: "POST" }
     );
   },
+
+  // Auth & Multi-Tenancy API
+  getProfile: () => request<any>("/auth/me"),
+  login: (email: string, password?: string, org_slug?: string) =>
+    request<any>("/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password, org_slug }),
+    }),
+  registerOrg: (data: { org_name: string; org_slug: string; admin_name: string; admin_email: string; admin_password?: string }) =>
+    request<any>("/auth/register-org", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    }),
+  switchOrg: (target_org_id: string) =>
+    request<any>("/auth/switch-org", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ target_org_id }),
+    }),
+
+  // Organizations Management API
+  getOrganization: () => request<any>("/organizations/current"),
+  updateOrganization: (data: { name?: string; allowed_domains?: string[] }) =>
+    request<any>("/organizations/current", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    }),
+  getMembers: () => request<any[]>("/organizations/current/members"),
+  inviteMember: (email: string, role = "member") =>
+    request<any>("/organizations/current/invitations", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, role }),
+    }),
+  removeMember: (userId: string) =>
+    request<any>(`/organizations/current/members/${userId}`, { method: "DELETE" }),
+  getRetentionPolicy: () => request<any>("/organizations/current/retention"),
+  updateRetentionPolicy: (policy: any) =>
+    request<any>("/organizations/current/retention", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(policy),
+    }),
+  previewRetentionCleanup: () =>
+    request<any>("/organizations/current/retention/preview", { method: "POST" }),
 };
