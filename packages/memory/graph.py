@@ -145,14 +145,17 @@ class GraphService:
             )
         ).scalar() or 0
 
-        # 5. Canonical Entities & Relationships — scoped via meeting membership
-        org_meeting_ids_stmt = select(MeetingModel.id).where(MeetingModel.org_id == self.org_id)
-        org_meeting_ids = list((await self.session.execute(org_meeting_ids_stmt)).scalars().all())
+        # 5. Canonical Entities & Relationships — scoped via meeting membership subquery
+        org_meeting_subquery = (
+            select(MeetingModel.id)
+            .where(MeetingModel.org_id == self.org_id, MeetingModel.deleted_at.is_(None))
+            .scalar_subquery()
+        )
 
         entities_count = (
             await self.session.execute(
                 select(func.count(distinct(MeetingEntityModel.entity_id))).where(
-                    MeetingEntityModel.meeting_id.in_(org_meeting_ids)
+                    MeetingEntityModel.meeting_id.in_(org_meeting_subquery)
                 )
             )
         ).scalar() or 0
@@ -160,7 +163,7 @@ class GraphService:
         relationships_count = (
             await self.session.execute(
                 select(func.count(RelationshipModel.id)).where(
-                    RelationshipModel.meeting_id.in_(org_meeting_ids)
+                    RelationshipModel.meeting_id.in_(org_meeting_subquery)
                 )
             )
         ).scalar() or 0

@@ -119,17 +119,17 @@ export const EntitiesList: React.FC = () => {
         </div>
       ) : (
         <section className="entities-grid">
-          {entities.map((ent) => (
+          {entities.map((ent: any) => (
             <div key={ent.id} className="card entity-card" onClick={() => handleEntityClick(ent.id)}>
               <div>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <span className="entity-type-badge">{ent.type}</span>
-                  {getEntityIcon(ent.type)}
+                  <span className="entity-type-badge">{ent.type || ent.entity_type || "ENTITY"}</span>
+                  {getEntityIcon(ent.type || ent.entity_type || "")}
                 </div>
-                <h3 className="entity-name">{ent.name}</h3>
+                <h3 className="entity-name">{ent.name || ent.label}</h3>
               </div>
               <div className="entity-presence" style={{ marginTop: "16px" }}>
-                Mentioned in {ent.presence_count} meetings
+                Mentioned in {ent.presence_count || ent.mention_count || 1} meetings
               </div>
             </div>
           ))}
@@ -149,16 +149,16 @@ export const EntitiesList: React.FC = () => {
             {/* Metadata and aliases card */}
             <div className="card" style={{ padding: "16px" }}>
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "12px" }}>
-                <span className="badge badge-queued">{entityDetail.entity.entity_type}</span>
+                <span className="badge badge-queued">{entityDetail.entity?.entity_type || "ENTITY"}</span>
                 <span style={{ fontSize: "13px", color: "var(--text-secondary)" }}>
-                  Present in {entityDetail.meetings_count} meetings
+                  Present in {entityDetail.meetings_count || 1} meetings
                 </span>
               </div>
-              <h2 className="entity-name" style={{ fontSize: "22px" }}>{entityDetail.entity.name}</h2>
-              {entityDetail.entity.aliases && entityDetail.entity.aliases.length > 0 && (
+              <h2 className="entity-name" style={{ fontSize: "22px" }}>{entityDetail.entity?.name || selectedEntityId}</h2>
+              {entityDetail.entity?.aliases && entityDetail.entity.aliases.length > 0 && (
                 <div style={{ marginTop: "10px", fontSize: "13px", color: "var(--text-secondary)" }}>
                   <span style={{ fontWeight: 600 }}>Resolved Aliases:</span>{" "}
-                  {entityDetail.entity.aliases.map((alias, i) => (
+                  {entityDetail.entity.aliases.map((alias: any, i: number) => (
                     <span key={i} className="badge" style={{ backgroundColor: "rgba(255,255,255,0.05)", marginLeft: "6px", textTransform: "none" }}>
                       {alias}
                     </span>
@@ -171,16 +171,16 @@ export const EntitiesList: React.FC = () => {
             <div>
               <h4 className="form-label" style={{ marginBottom: "10px" }}>Relational Neighborhood Graph</h4>
               <div className="graph-neighborhood">
-                <div className="graph-root-node">{entityDetail.entity.name}</div>
+                <div className="graph-root-node">{entityDetail.entity?.name || selectedEntityId}</div>
                 
-                {entityDetail.relationships.length === 0 ? (
+                {(!entityDetail.relationships || entityDetail.relationships.length === 0) ? (
                   <p style={{ alignSelf: "center", fontSize: "12px", color: "var(--text-muted)", marginTop: "12px" }}>
                     No cross-meeting relationship links resolved for this node.
                   </p>
                 ) : (
                   <div className="graph-edges-container">
-                    {entityDetail.relationships.map((rel) => {
-                      const isSource = rel.source_entity_id.toLowerCase() === entityDetail.entity.entity_id.toLowerCase()
+                    {entityDetail.relationships.map((rel: any) => {
+                      const isSource = rel.source_entity_id?.toLowerCase() === entityDetail.entity?.entity_id?.toLowerCase()
                       const neighborId = isSource ? rel.target_entity_id : rel.source_entity_id
                       return (
                         <div key={rel.relation_id} className="graph-edge-card">
@@ -200,13 +200,13 @@ export const EntitiesList: React.FC = () => {
             {entityTimeline && (
               <div>
                 <h4 className="form-label" style={{ marginBottom: "10px" }}>Entity Lifecycle Timeline</h4>
-                {entityTimeline.events.length === 0 && entityTimeline.decisions.length === 0 && entityTimeline.commitments.length === 0 ? (
+                {(!entityTimeline.events?.length && !entityTimeline.decisions?.length && !entityTimeline.commitments?.length) ? (
                   <p style={{ fontSize: "12px", color: "var(--text-muted)" }}>
                     No events tracked specifically for this entity.
                   </p>
                 ) : (
                   <div className="timeline-stream" style={{ maxHeight: "300px", overflowY: "auto", padding: "10px" }}>
-                    {entityTimeline.decisions.map((dec) => (
+                    {entityTimeline.decisions?.map((dec: any) => (
                       <div key={dec.decision_id} className="timeline-event modified">
                         <div className="timeline-node"></div>
                         <div className="card timeline-card" style={{ padding: "12px" }}>
@@ -216,7 +216,7 @@ export const EntitiesList: React.FC = () => {
                         </div>
                       </div>
                     ))}
-                    {entityTimeline.commitments.map((com) => (
+                    {entityTimeline.commitments?.map((com: any) => (
                       <div key={com.commitment_id} className="timeline-event detected">
                         <div className="timeline-node"></div>
                         <div className="card timeline-card" style={{ padding: "12px" }}>
@@ -226,7 +226,7 @@ export const EntitiesList: React.FC = () => {
                         </div>
                       </div>
                     ))}
-                    {entityTimeline.events.map((evt) => (
+                    {entityTimeline.events?.map((evt: any) => (
                       <div key={evt.event_id} className="timeline-event">
                         <div className="timeline-node"></div>
                         <div className="card timeline-card" style={{ padding: "12px" }}>

@@ -15,6 +15,15 @@ from packages.connectors.registry import (
 from packages.connectors.teams import TeamsMeetingConnector
 from packages.connectors.zoom import ZoomMeetingConnector
 
+from packages.connectors.calendar import (
+    BaseCalendarProvider,
+    CalendarEvent,
+    CalendarRegistry,
+    GoogleCalendarProvider,
+    MicrosoftCalendarProvider,
+    calendar_registry,
+)
+
 # Auto-register default meeting connectors
 connector_registry.register(TeamsMeetingConnector())
 connector_registry.register(ZoomMeetingConnector())
@@ -33,4 +42,11 @@ __all__ = [
     "TeamsMeetingConnector",
     "ZoomMeetingConnector",
     "GoogleMeetMeetingConnector",
+    "BaseCalendarProvider",
+    "CalendarEvent",
+    "CalendarRegistry",
+    "calendar_registry",
+    "GoogleCalendarProvider",
+    "MicrosoftCalendarProvider",
 ]
+

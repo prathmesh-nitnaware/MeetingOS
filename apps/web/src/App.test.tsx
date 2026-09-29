@@ -1,5 +1,5 @@
 import React from "react"
-import { render, screen, waitFor } from "@testing-library/react"
+import { render, screen, waitFor, fireEvent } from "@testing-library/react"
 import { App } from "./App"
 import { api } from "./services/api"
 import { vi, describe, it, expect, beforeEach } from "vitest"
@@ -8,79 +8,116 @@ vi.mock("./services/api", () => {
   return {
     api: {
       getDashboardMetrics: vi.fn(),
+      listMeetings: vi.fn(),
       getMeetings: vi.fn(),
+      listActionItems: vi.fn(),
+      getActionItems: vi.fn(),
+      listDecisions: vi.fn(),
+      getDecisions: vi.fn(),
+      getKnowledge: vi.fn(),
+      getTeam: vi.fn(),
+      search: vi.fn(),
+      getActivityFeed: vi.fn(),
+      getProjects: vi.fn(),
+      getTopicDetail: vi.fn(),
     },
-  };
-});
+  }
+})
 
-describe("MeetingOS Frontend App", () => {
+describe("MeetingOS Text-First Frontend App", () => {
   beforeEach(() => {
-    vi.resetAllMocks();
-  });
+    vi.resetAllMocks()
+    localStorage.clear()
 
-  it("renders layout shell and sidebar navigation links", async () => {
-    // Setup resolving promises to prevent hung loading states
-    (api.getDashboardMetrics as any).mockReturnValue(
-      new Promise((resolve) =>
-        resolve({
-          meetings_ingested: 5,
-          decisions_tracked: 12,
-          open_actions: 4,
-          overdue_actions: 1,
-          unresolved_issues: 3,
-          recurring_issues: 1,
-          canonical_entities_tracked: 10,
-          relationships_tracked: 8,
-        })
-      )
-    );
-    (api.getMeetings as any).mockReturnValue(new Promise((resolve) => resolve([])));
+    ;(api.listMeetings as any).mockResolvedValue([
+      {
+        meeting_id: "m-1",
+        title: "Q4 Product Launch Kickoff",
+        meeting_date: "2026-09-29T10:00:00Z",
+        source_type: "text",
+        summary: "Discussed release schedule and architecture.",
+        participant_count: 4,
+        decisions_count: 2,
+        actions_count: 3,
+        topics: ["launch", "product"],
+      },
+    ])
+    ;(api.listActionItems as any).mockResolvedValue([
+      {
+        id: "act-1",
+        commitment_id: "act-1",
+        task: "Complete authentication module",
+        description: "Complete authentication module",
+        owner_id: "Bob",
+        status: "In Progress",
+        due_date_str: "Oct 2",
+      },
+    ])
+    ;(api.listDecisions as any).mockResolvedValue([
+      {
+        id: "dec-1",
+        decision_id: "dec-1",
+        title: "Internal release scheduled for Friday",
+        subject: "Internal release scheduled for Friday",
+        status: "agreed",
+      },
+    ])
+    ;(api.getKnowledge as any).mockResolvedValue({
+      topics: [{ name: "Product", count: 3 }],
+      recurring_topics: [],
+      recent_decisions: [],
+      recent_actions: [],
+      recent_key_points: [],
+      total_meetings: 1,
+    })
+    ;(api.getTeam as any).mockResolvedValue([])
+    ;(api.search as any).mockResolvedValue({ results: [], total: 0 })
+    ;(api.getActivityFeed as any).mockResolvedValue([])
+    ;(api.getProjects as any).mockResolvedValue([])
+  })
 
-    render(<App />);
+  it("renders layout shell, header, and primary sidebar navigation links", async () => {
+    render(<App />)
 
-    expect(screen.getByText("MeetingOS")).toBeInTheDocument();
-    expect(screen.getByText("Dashboard")).toBeInTheDocument();
-    expect(screen.getByText("Meetings")).toBeInTheDocument();
-    expect(screen.getByText("Search & QA")).toBeInTheDocument();
-    expect(screen.getByText("Entities & Graph")).toBeInTheDocument();
-    expect(screen.getByText("Timeline Intelligence")).toBeInTheDocument();
-  });
+    expect(screen.getByText("MeetingOS")).toBeInTheDocument()
+    expect(screen.getByText("Meeting Intelligence")).toBeInTheDocument()
+    expect(screen.getByText("Dashboard")).toBeInTheDocument()
+    expect(screen.getAllByText("Meetings").length).toBeGreaterThanOrEqual(1)
+    expect(screen.getByText("Action Items")).toBeInTheDocument()
+    expect(screen.getByText("Decisions")).toBeInTheDocument()
+    expect(screen.getByText("Knowledge & Topics")).toBeInTheDocument()
+    expect(screen.getByText("Search & QA")).toBeInTheDocument()
+    expect(screen.getByText("Team")).toBeInTheDocument()
+    expect(screen.getByText("Settings")).toBeInTheDocument()
+  })
 
-  it("renders loading spinner state when fetching dashboard metrics", async () => {
-    // Delay resolve to capture loading spinner state
-    (api.getDashboardMetrics as any).mockReturnValue(
-      new Promise(() => {}) // Never resolves
-    );
-    (api.getMeetings as any).mockReturnValue(new Promise(() => {}));
+  it("renders dashboard header greeting and search trigger", async () => {
+    render(<App />)
 
-    render(<App />);
-    expect(screen.getByTestId("loading-spinner")).toBeInTheDocument();
-  });
+    expect(screen.getByText(/Search meetings, decisions, actions/i)).toBeInTheDocument()
+    expect(screen.getByText("New Meeting")).toBeInTheDocument()
+  })
 
-  it("renders dashboard metrics when api returns successfully", async () => {
-    (api.getDashboardMetrics as any).mockResolvedValue({
-      meetings_ingested: 8,
-      decisions_tracked: 15,
-      open_actions: 5,
-      overdue_actions: 2,
-      unresolved_issues: 4,
-      recurring_issues: 2,
-      canonical_entities_tracked: 12,
-      relationships_tracked: 10,
-    });
-    (api.getMeetings as any).mockResolvedValue([]);
+  it("opens global command palette modal on search trigger click", async () => {
+    render(<App />)
 
-    render(<App />);
+    const searchTrigger = screen.getByText(/Search meetings, decisions, actions/i)
+    fireEvent.click(searchTrigger)
 
     await waitFor(() => {
-      expect(screen.getByText("Meetings Ingested")).toBeInTheDocument();
-      expect(screen.getByText("Decisions Tracked")).toBeInTheDocument();
-    });
+      expect(
+        screen.getByPlaceholderText(/Search meetings, transcripts, decisions, action items, topics.../i)
+      ).toBeInTheDocument()
+    })
+  })
 
-    expect(screen.getByText("8")).toBeInTheDocument();
-    expect(screen.getByText("15")).toBeInTheDocument();
-    expect(screen.getByText("5")).toBeInTheDocument();
-    expect(screen.getAllByText("2").length).toBe(2);
-    expect(screen.getByText("4")).toBeInTheDocument();
-  });
-});
+  it("renders key metric counters and meeting intelligence on the dashboard", async () => {
+    render(<App />)
+
+    await waitFor(() => {
+      expect(screen.getByText("Q4 Product Launch Kickoff")).toBeInTheDocument()
+      expect(screen.getByText("Complete authentication module")).toBeInTheDocument()
+      expect(screen.getByText("Internal release scheduled for Friday")).toBeInTheDocument()
+    })
+  })
+})

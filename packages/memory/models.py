@@ -44,11 +44,16 @@ class MeetingModel(Base):
         DateTime(timezone=True), nullable=False, index=True
     )
     duration_seconds: Mapped[float | None] = mapped_column(Float, nullable=True)
-    source_type: Mapped[str] = mapped_column(String(50), nullable=False, default="audio/wav")
+    source_type: Mapped[str] = mapped_column(String(50), nullable=False, default="text/plain")
+    content_type: Mapped[str] = mapped_column(String(50), nullable=False, default="transcript")
+    content: Mapped[str | None] = mapped_column(Text, nullable=True)
+    summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    key_points_json: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
+    project_id: Mapped[str | None] = mapped_column(String(100), nullable=True, index=True)
     processing_status: Mapped[str] = mapped_column(
         String(50), nullable=False, default="queued", index=True
     )
-    model_pipeline_version: Mapped[str] = mapped_column(String(50), nullable=False, default="1.0.0")
+    model_pipeline_version: Mapped[str] = mapped_column(String(50), nullable=False, default="2.0.0")
     metadata_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     source_provider: Mapped[str | None] = mapped_column(String(100), nullable=True, index=True)
     external_meeting_id: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
@@ -228,6 +233,29 @@ class MeetingEntityModel(Base):
     __table_args__ = (Index("ix_meeting_entities_unique", "meeting_id", "entity_id", unique=True),)
 
 
+class ProjectModel(Base):
+    """Relational table representing projects grouping meetings and intelligence."""
+
+    __tablename__ = "projects"
+
+    id: Mapped[str] = mapped_column(String(100), primary_key=True, default=lambda: str(uuid4()))
+    org_id: Mapped[str] = mapped_column(String(64), nullable=False, default="org_dev", index=True)
+    name: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    color: Mapped[str | None] = mapped_column(String(50), nullable=True, default="#4f46e5")
+    status: Mapped[str] = mapped_column(String(50), nullable=False, default="active", index=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False
+    )
+
+    __table_args__ = (
+        Index("ix_projects_org_status", "org_id", "status"),
+    )
+
+
 class TopicModel(Base):
     """Relational table storing meeting discussion topics."""
 
@@ -238,6 +266,8 @@ class TopicModel(Base):
         String(100), ForeignKey("meetings.id", ondelete="CASCADE"), nullable=False, index=True
     )
     name: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    source_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    confidence: Mapped[float] = mapped_column(Float, nullable=False, default=1.0)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, nullable=False
     )
@@ -254,10 +284,17 @@ class DecisionModel(Base):
     meeting_id: Mapped[str] = mapped_column(
         String(100), ForeignKey("meetings.id", ondelete="CASCADE"), nullable=False, index=True
     )
+    title: Mapped[str | None] = mapped_column(String(500), nullable=True)
     subject: Mapped[str] = mapped_column(Text, nullable=False)
     status: Mapped[str] = mapped_column(String(50), nullable=False, default="Approved", index=True)
+    context: Mapped[str | None] = mapped_column(Text, nullable=True)
     rationale: Mapped[str | None] = mapped_column(Text, nullable=True)
+    confidence: Mapped[float] = mapped_column(Float, nullable=False, default=1.0)
     evidence_segment_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    source_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    source_start: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    source_end: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    review_status: Mapped[str] = mapped_column(String(50), nullable=False, default="needs_review", index=True)
     model_name: Mapped[str] = mapped_column(String(100), nullable=False, default="mock-nlp-model")
     model_version: Mapped[str] = mapped_column(String(50), nullable=False, default="1.0.0")
     pipeline_version: Mapped[str] = mapped_column(String(50), nullable=False, default="1.0.0")
@@ -280,11 +317,15 @@ class CommitmentModel(Base):
     meeting_id: Mapped[str] = mapped_column(
         String(100), ForeignKey("meetings.id", ondelete="CASCADE"), nullable=False, index=True
     )
+    task: Mapped[str | None] = mapped_column(Text, nullable=True)
     description: Mapped[str] = mapped_column(Text, nullable=False)
     owner_id: Mapped[str | None] = mapped_column(String(100), nullable=True, index=True)
     status: Mapped[str] = mapped_column(
         String(50), nullable=False, default="In Progress", index=True
     )
+    priority: Mapped[str] = mapped_column(String(20), nullable=False, default="medium")
+    due_date_str: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    confidence: Mapped[float] = mapped_column(Float, nullable=False, default=1.0)
     original_deadline: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
@@ -292,11 +333,18 @@ class CommitmentModel(Base):
         DateTime(timezone=True), nullable=True
     )
     evidence_segment_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    source_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    source_start: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    source_end: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    review_status: Mapped[str] = mapped_column(String(50), nullable=False, default="needs_review", index=True)
     model_name: Mapped[str] = mapped_column(String(100), nullable=False, default="mock-nlp-model")
     model_version: Mapped[str] = mapped_column(String(50), nullable=False, default="1.0.0")
     pipeline_version: Mapped[str] = mapped_column(String(50), nullable=False, default="1.0.0")
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False
     )
 
     meeting: Mapped["MeetingModel"] = relationship("MeetingModel", back_populates="commitments")

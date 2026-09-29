@@ -4,20 +4,28 @@ from contextlib import asynccontextmanager
 
 from apps.api.config import settings
 from apps.api.middleware.logging import StructuredLoggingMiddleware
+from apps.api.routers.actions import router as actions_router
 from apps.api.routers.admin import router as admin_router
 from apps.api.routers.audit import router as audit_router
 from apps.api.routers.auth import router as auth_router
+from apps.api.routers.calendar import router as calendar_router
+from apps.api.routers.collaboration import router as collaboration_router
 from apps.api.routers.connectors import router as connectors_router
 from apps.api.routers.dashboard import router as dashboard_router
+from apps.api.routers.decisions import router as decisions_router
+from apps.api.routers.demo import router as demo_router
 from apps.api.routers.entities import router as entities_router
 from apps.api.routers.graph import router as graph_router
 from apps.api.routers.health import router as health_router
 from apps.api.routers.jobs import router as jobs_router
+from apps.api.routers.knowledge import router as knowledge_router
 from apps.api.routers.meetings import router as meetings_router
 from apps.api.routers.metrics import router as metrics_router
 from apps.api.routers.organizations import router as organizations_router
+from apps.api.routers.projects import router as projects_router
 from apps.api.routers.query import router as query_router
 from apps.api.routers.search import router as search_router
+from apps.api.routers.team import router as team_router
 from apps.api.routers.temporal import router as temporal_router
 from apps.api.routers.traces import router as traces_router
 from fastapi import FastAPI
@@ -35,13 +43,12 @@ async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info(
         "Starting %s v%s in %s mode", settings.app_name, settings.app_version, settings.app_env
     )
-    if "sqlite" in settings.database_url:
-        try:
-            engine = get_engine(settings.database_url)
-            await init_db(engine)
-            logger.info("SQLite database schema initialized.")
-        except Exception as exc:
-            logger.warning("Database schema auto-initialization skipped: %s", exc)
+    try:
+        engine = get_engine(settings.database_url)
+        await init_db(engine)
+        logger.info("Database schema initialized and reconciled.")
+    except Exception as exc:
+        logger.warning("Database schema auto-initialization skipped: %s", exc)
 
     yield
     logger.info("Shutting down %s", settings.app_name)
@@ -76,7 +83,15 @@ def create_app() -> FastAPI:
     app.include_router(health_router, prefix=settings.api_v1_prefix)
     app.include_router(auth_router, prefix=settings.api_v1_prefix)
     app.include_router(organizations_router, prefix=settings.api_v1_prefix)
+    app.include_router(projects_router, prefix=settings.api_v1_prefix)
     app.include_router(meetings_router, prefix=settings.api_v1_prefix)
+    app.include_router(actions_router, prefix=settings.api_v1_prefix)
+    app.include_router(decisions_router, prefix=settings.api_v1_prefix)
+    app.include_router(knowledge_router, prefix=settings.api_v1_prefix)
+    app.include_router(team_router, prefix=settings.api_v1_prefix)
+    app.include_router(demo_router, prefix=settings.api_v1_prefix)
+    app.include_router(calendar_router, prefix=settings.api_v1_prefix)
+    app.include_router(collaboration_router, prefix=settings.api_v1_prefix)
     app.include_router(jobs_router, prefix=settings.api_v1_prefix)
     app.include_router(search_router, prefix=settings.api_v1_prefix)
     app.include_router(graph_router, prefix=settings.api_v1_prefix)
@@ -89,6 +104,9 @@ def create_app() -> FastAPI:
     app.include_router(admin_router, prefix=settings.api_v1_prefix)
     app.include_router(traces_router, prefix=settings.api_v1_prefix)
     app.include_router(metrics_router, prefix=settings.api_v1_prefix)
+
+    # Root WebSocket / presence route fallback
+    app.include_router(collaboration_router)
 
     @app.get("/")
     async def root_redirect() -> dict[str, str]:

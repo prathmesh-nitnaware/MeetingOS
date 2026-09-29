@@ -34,7 +34,8 @@ class RateLimiter:
                 # Clear timestamps older than the sliding window boundary
                 pipe.zremrangebyscore(key, 0, now - self.window_seconds)
                 # Add current request score/timestamp
-                pipe.zadd(key, {str(now): now})
+                member = f"{now}:{time.perf_counter_ns()}"
+                pipe.zadd(key, {member: now})
                 # Count current window volume
                 pipe.zcard(key)
                 # Refresh sliding window expiration

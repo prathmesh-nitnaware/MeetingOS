@@ -125,7 +125,7 @@ export const SearchQA: React.FC = () => {
           <h1 className="page-title">Search & Decisions QA</h1>
           <p className="page-subtitle">Ask questions across meetings or run multi-channel hybrid searches.</p>
         </div>
-        <div style={{ display: "flex", gap: "8px", background: "var(--bg-glass)", border: "1px solid var(--border-light)", borderRadius: "8px", padding: "4px" }}>
+        <div style={{ display: "flex", gap: "8px", background: "var(--bg-card)", border: "1px solid var(--border-subtle)", borderRadius: "8px", padding: "4px" }}>
           <button
             className={`btn ${activeMode === "qa" ? "btn-primary" : "btn-outline"}`}
             style={{ padding: "8px 16px" }}
@@ -264,7 +264,7 @@ export const SearchQA: React.FC = () => {
                 {qaResponse.reasoning_path && qaResponse.reasoning_path.length > 0 && (
                   <div className="reasoning-list">
                     <span style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase", color: "var(--text-muted)", marginBottom: "4px" }}>Reasoning Steps:</span>
-                    {qaResponse.reasoning_path.map((step, idx) => (
+                    {qaResponse.reasoning_path.map((step: any, idx: number) => (
                       <div key={idx} className="reasoning-step">
                         <span>[{idx + 1}]</span>
                         <span>{step}</span>
@@ -276,25 +276,25 @@ export const SearchQA: React.FC = () => {
 
               <div>
                 <h4 className="evidence-title">Retrieved Evidence & Citations</h4>
-                {qaResponse.evidence.length === 0 ? (
+                {(!qaResponse.evidence || qaResponse.evidence.length === 0) ? (
                   <div className="card empty-state" style={{ padding: "30px 0" }}>
                     <HelpCircle size={32} className="empty-state-icon" />
                     <p>No direct transcript evidence links returned for this query.</p>
                   </div>
                 ) : (
                   <div className="evidence-grid">
-                    {qaResponse.evidence.map((ev, i) => (
+                    {qaResponse.evidence.map((ev: any, i: number) => (
                       <div key={i} className="card evidence-card" style={{ borderLeft: "3px solid var(--accent-purple)" }}>
                         <div className="evidence-header">
                           <span style={{ fontWeight: 600 }}>Citing segment <code>{ev.segment_id}</code></span>
                           <span>
-                            Timestamp: {Math.floor(ev.start_time / 60)}:
-                            {String(Math.floor(ev.start_time % 60)).padStart(2, "0")} -{" "}
-                            {Math.floor(ev.end_time / 60)}:
-                            {String(Math.floor(ev.end_time % 60)).padStart(2, "0")}
+                            Timestamp: {Math.floor((ev.start_time || 0) / 60)}:
+                            {String(Math.floor((ev.start_time || 0) % 60)).padStart(2, "0")} -{" "}
+                            {Math.floor((ev.end_time || 0) / 60)}:
+                            {String(Math.floor((ev.end_time || 0) % 60)).padStart(2, "0")}
                           </span>
                         </div>
-                        <p className="evidence-snippet">"{ev.text_snapshot}"</p>
+                        <p className="evidence-snippet">"{ev.text_snapshot || ev.text || ev.content}"</p>
                         <div style={{ marginTop: "12px", textAlign: "right" }}>
                           <button
                             className="link-evidence"
@@ -377,7 +377,7 @@ export const SearchQA: React.FC = () => {
                 {agenticResponse.trace && agenticResponse.trace.length > 0 && (
                   <div className="reasoning-list" style={{ marginTop: "20px" }}>
                     <span style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase", color: "var(--text-muted)", marginBottom: "8px", display: "block" }}>Agent Trace Metrics:</span>
-                    {agenticResponse.trace.map((t, idx) => (
+                    {agenticResponse.trace.map((t: any, idx: number) => (
                       <div key={idx} className="reasoning-step" style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
                         <span style={{ fontWeight: 600 }}>{t.agent.charAt(0).toUpperCase() + t.agent.slice(1)} Agent</span>
                         <span style={{ color: t.status === "completed" ? "#34d399" : t.status === "skipped" ? "var(--text-muted)" : "#f87171" }}>
@@ -395,7 +395,7 @@ export const SearchQA: React.FC = () => {
                   <div style={{ marginTop: "20px", borderTop: "1px solid var(--border-light)", paddingTop: "12px" }}>
                     <span style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase", color: "var(--text-muted)", display: "block", marginBottom: "6px" }}>Source Citations:</span>
                     <ul style={{ paddingLeft: "16px", margin: 0, fontSize: "13px", display: "flex", flexDirection: "column", gap: "4px" }}>
-                      {agenticResponse.citations.map((c, i) => (
+                      {agenticResponse.citations.map((c: any, i: number) => (
                         <li key={i}>{c}</li>
                       ))}
                     </ul>
@@ -405,25 +405,25 @@ export const SearchQA: React.FC = () => {
 
               <div>
                 <h4 className="evidence-title">Retrieved Evidence & Citations</h4>
-                {agenticResponse.evidence.length === 0 ? (
+                {(!agenticResponse.evidence || agenticResponse.evidence.length === 0) ? (
                   <div className="card empty-state" style={{ padding: "30px 0" }}>
                     <HelpCircle size={32} className="empty-state-icon" />
                     <p>No direct transcript evidence links returned for this query.</p>
                   </div>
                 ) : (
                   <div className="evidence-grid">
-                    {agenticResponse.evidence.map((ev, i) => (
+                    {agenticResponse.evidence.map((ev: any, i: number) => (
                       <div key={i} className="card evidence-card" style={{ borderLeft: "3px solid var(--accent-purple)" }}>
                         <div className="evidence-header">
                           <span style={{ fontWeight: 600 }}>Citing segment <code>{ev.segment_id}</code></span>
                           <span>
-                            Timestamp: {Math.floor(ev.start_time / 60)}:
-                            {String(Math.floor(ev.start_time % 60)).padStart(2, "0")} -{" "}
-                            {Math.floor(ev.end_time / 60)}:
-                            {String(Math.floor(ev.end_time % 60)).padStart(2, "0")}
+                            Timestamp: {Math.floor((ev.start_time || 0) / 60)}:
+                            {String(Math.floor((ev.start_time || 0) % 60)).padStart(2, "0")} -{" "}
+                            {Math.floor((ev.end_time || 0) / 60)}:
+                            {String(Math.floor((ev.end_time || 0) % 60)).padStart(2, "0")}
                           </span>
                         </div>
-                        <p className="evidence-snippet">"{ev.content}"</p>
+                        <p className="evidence-snippet">"{ev.content || ev.text}"</p>
                         <div style={{ marginTop: "12px", textAlign: "right" }}>
                           <button
                             className="link-evidence"
@@ -534,7 +534,7 @@ export const SearchQA: React.FC = () => {
                         </span>
                         <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
                           <Calendar size={12} />
-                          {new Date(res.meeting_date).toLocaleDateString()}
+                          {res.meeting_date ? new Date(res.meeting_date).toLocaleDateString() : "Recent"}
                         </span>
                       </div>
                       <div style={{ display: "flex", justifyContent: "space-between", margin: "6px 0", fontSize: "11px", color: "var(--text-muted)" }}>

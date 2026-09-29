@@ -1,249 +1,293 @@
-import React, { useState, useEffect } from "react"
-import { useNavigate } from "react-router-dom"
-import { api, MeetingSummary } from "../services/api"
-import { Spinner } from "../components/Spinner"
-import { Modal } from "../components/Modal"
-import { StatusBadge } from "../components/StatusBadge"
-import { Plus, Video, Calendar, Search, AlertCircle } from "lucide-react"
+import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import {
+  Calendar,
+  Search,
+  Filter,
+  Plus,
+  LayoutList,
+  LayoutGrid,
+  Users,
+  CheckSquare,
+  Target,
+  Sparkles,
+  ArrowRight,
+  Trash2,
+  Tag
+} from "lucide-react";
+import { api, MeetingSummary } from "../services/api";
 
 export const MeetingsList: React.FC = () => {
-  const navigate = useNavigate()
-  const [meetings, setMeetings] = useState<MeetingSummary[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [searchTerm, setSearchTerm] = useState("")
-
-  // Ingest Form States
-  const [isModalOpen, setIsModalOpen] = useState(false)
-  const [title, setTitle] = useState("")
-  const [file, setFile] = useState<File | null>(null)
-  const [meetingDate, setMeetingDate] = useState("")
-  const [participants, setParticipants] = useState("")
-  const [asyncProcessing, setAsyncProcessing] = useState(false)
-  const [submitting, setSubmitting] = useState(false)
-  const [submitError, setSubmitError] = useState<string | null>(null)
-
-  const loadMeetings = async () => {
-    try {
-      setLoading(true)
-      setError(null)
-      const data = await api.getMeetings(100, 0)
-      setMeetings(data)
-    } catch (err: any) {
-      setError(err.message || "Failed to load meetings.")
-    } finally {
-      setLoading(false)
-    }
-  }
+  const navigate = useNavigate();
+  const [meetings, setMeetings] = useState<MeetingSummary[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedTopic, setSelectedTopic] = useState<string>("All");
+  const [viewMode, setViewMode] = useState<"list" | "grid">("list");
+  const [allTopics, setAllTopics] = useState<string[]>([]);
 
   useEffect(() => {
-    loadMeetings()
-  }, [])
+    fetchMeetings();
+  }, []);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setFile(e.target.files[0])
-    }
-  }
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!title || !file) {
-      setSubmitError("Title and Meeting File are required.")
-      return
-    }
-
-    setSubmitting(true)
-    setSubmitError(null)
-
+  const fetchMeetings = async () => {
+    setLoading(true);
     try {
-      const formData = new FormData()
-      formData.append("file", file)
-      formData.append("title", title)
-      if (meetingDate) {
-        formData.append("meeting_date", meetingDate)
-      }
-      if (participants) {
-        const partsList = participants.split(",").map(p => p.trim()).filter(Boolean)
-        formData.append("participants", JSON.stringify(partsList))
-      }
-      formData.append("async_processing", String(asyncProcessing))
+      const data = await api.listMeetings();
+      setMeetings(data || []);
 
-      const res = await api.uploadMeeting(formData)
-      setIsModalOpen(false)
-      // Reset form
-      setTitle("")
-      setFile(null)
-      setMeetingDate("")
-      setParticipants("")
-      setAsyncProcessing(false)
-      
-      // Reload meetings list
-      loadMeetings()
-
-      // Redirect to detail
-      navigate(`/meetings/${res.meeting_id}`)
-    } catch (err: any) {
-      setSubmitError(err.message || "Failed to upload meeting.")
+      // Gather unique topics
+      const topicsSet = new Set<string>();
+      (data || []).forEach((m) => {
+        (m.topics || []).forEach((t) => topicsSet.add(t));
+      });
+      setAllTopics(Array.from(topicsSet));
+    } catch (err) {
+      console.error("Failed to load meetings", err);
     } finally {
-      setSubmitting(false)
+      setLoading(false);
     }
-  }
+  };
 
-  const filteredMeetings = meetings.filter((m) =>
-    m.title.toLowerCase().includes(searchTerm.toLowerCase())
-  )
+  const filteredMeetings = meetings.filter((m) => {
+    const matchesSearch =
+      m.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (m.summary && m.summary.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (m.topics && m.topics.some((t) => t.toLowerCase().includes(searchQuery.toLowerCase())));
 
-  if (loading) return <Spinner message="Fetching organizational meetings..." />
+    const matchesTopic =
+      selectedTopic === "All" ||
+      (m.topics && m.topics.some((t) => t.toLowerCase() === selectedTopic.toLowerCase()));
+
+    return matchesSearch && matchesTopic;
+  });
+
+  const handleDeleteMeeting = async (e: React.MouseEvent, meetingId: string) => {
+    e.stopPropagation();
+    if (window.confirm("Are you sure you want to remove this meeting?")) {
+      try {
+        await api.deleteMeeting(meetingId);
+        setMeetings((prev) => prev.filter((m) => m.meeting_id !== meetingId));
+      } catch (err) {
+        console.error("Failed to delete meeting", err);
+      }
+    }
+  };
 
   return (
-    <div className="meetings-list-page">
-      <header className="page-header">
+    <div className="page-container">
+      {/* Header */}
+      <div className="page-header-row">
         <div>
-          <h1 className="page-title">Meeting Directory</h1>
-          <p className="page-subtitle">Manage, view, and analyze meeting recordings and transcript details.</p>
+          <h1 className="page-title">Meetings</h1>
+          <p className="page-subtitle">
+            Capture, understand, and revisit your team's conversations and structured knowledge.
+          </p>
         </div>
-        <button className="btn btn-primary" onClick={() => setIsModalOpen(true)}>
+
+        <button
+          type="button"
+          className="btn btn-primary"
+          onClick={() => navigate("/meetings/new")}
+        >
           <Plus size={16} />
-          <span>Ingest Meeting</span>
+          <span>New Meeting</span>
         </button>
-      </header>
-
-      {error && (
-        <div className="error-state">
-          <AlertCircle size={20} />
-          <span>{error}</span>
-        </div>
-      )}
-
-      <div className="card search-box" style={{ marginBottom: "24px", display: "flex", alignItems: "center", padding: "12px 20px" }}>
-        <Search size={18} className="text-secondary" style={{ marginRight: "8px" }} />
-        <input
-          type="text"
-          className="form-input"
-          style={{ border: "none", background: "none", padding: 0 }}
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          placeholder="Filter meetings by title..."
-        />
       </div>
 
-      <section className="card">
-        {filteredMeetings.length === 0 ? (
-          <div className="empty-state">
-            <Video size={48} className="empty-state-icon" />
-            <p>{searchTerm ? "No meetings match your search query." : "No meetings are currently registered."}</p>
-          </div>
-        ) : (
-          <div className="table-container">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Meeting Title</th>
-                  <th>Meeting Date</th>
-                  <th>Source Type</th>
-                  <th>Processing Status</th>
-                  <th>Segments Count</th>
-                  <th>Ingested At</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredMeetings.map((m) => (
-                  <tr key={m.meeting_id} style={{ cursor: "pointer" }} onClick={() => navigate(`/meetings/${m.meeting_id}`)}>
-                    <td style={{ fontWeight: 600, color: "var(--accent-sky)" }}>{m.title}</td>
-                    <td>
-                      <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
-                        <Calendar size={13} />
-                        {new Date(m.meeting_date).toLocaleDateString()}
+      {/* Controls Bar: Search, Topic Filter, View Toggle */}
+      <div className="meetings-controls-bar">
+        <div className="search-input-box">
+          <Search size={16} className="search-box-icon" />
+          <input
+            type="text"
+            className="search-box-input"
+            placeholder="Search meetings by title, summary, or topic..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </div>
+
+        {/* Topic Filter Pills */}
+        <div className="topic-filter-pills">
+          <button
+            type="button"
+            className={`pill-btn ${selectedTopic === "All" ? "active" : ""}`}
+            onClick={() => setSelectedTopic("All")}
+          >
+            All Topics
+          </button>
+          {allTopics.slice(0, 5).map((t) => (
+            <button
+              key={t}
+              type="button"
+              className={`pill-btn ${selectedTopic === t ? "active" : ""}`}
+              onClick={() => setSelectedTopic(t)}
+            >
+              #{t}
+            </button>
+          ))}
+        </div>
+
+        {/* View Mode Toggle */}
+        <div className="view-mode-toggle">
+          <button
+            type="button"
+            className={`view-btn ${viewMode === "list" ? "active" : ""}`}
+            onClick={() => setViewMode("list")}
+            title="List View"
+          >
+            <LayoutList size={16} />
+          </button>
+          <button
+            type="button"
+            className={`view-btn ${viewMode === "grid" ? "active" : ""}`}
+            onClick={() => setViewMode("grid")}
+            title="Grid View"
+          >
+            <LayoutGrid size={16} />
+          </button>
+        </div>
+      </div>
+
+      {/* Meeting List / Grid */}
+      {loading ? (
+        <div className="skeleton-container">
+          <div className="skeleton-card" />
+          <div className="skeleton-card" />
+          <div className="skeleton-card" />
+        </div>
+      ) : filteredMeetings.length === 0 ? (
+        <div className="empty-state-card">
+          <Calendar size={36} className="text-muted" />
+          <h3>No meetings found</h3>
+          <p>
+            {searchQuery || selectedTopic !== "All"
+              ? "Try adjusting your search or topic filter."
+              : "Create your first meeting and turn conversations into structured knowledge."}
+          </p>
+          <button
+            type="button"
+            className="btn btn-primary"
+            style={{ marginTop: "12px" }}
+            onClick={() => navigate("/meetings/new")}
+          >
+            <Plus size={16} /> + Create Meeting
+          </button>
+        </div>
+      ) : viewMode === "list" ? (
+        <div className="meetings-table-container">
+          <div className="meetings-list-table">
+            {filteredMeetings.map((m) => (
+              <div
+                key={m.meeting_id}
+                className="meeting-list-row"
+                onClick={() => navigate(`/meetings/${m.meeting_id}`)}
+              >
+                <div className="meeting-row-main">
+                  <div className="meeting-row-header">
+                    <h3 className="meeting-row-title">{m.title}</h3>
+                    <span className="meeting-row-date">
+                      {new Date(m.meeting_date).toLocaleDateString(undefined, {
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric",
+                      })}
+                    </span>
+                    <span className="meeting-row-participants">
+                      • {m.participant_count} participant{m.participant_count !== 1 ? "s" : ""}
+                    </span>
+                  </div>
+
+                  <p className="meeting-row-summary">
+                    {m.summary
+                      ? m.summary.length > 180
+                        ? m.summary.slice(0, 177) + "..."
+                        : m.summary
+                      : "Pasted text / notes meeting ready for AI review."}
+                  </p>
+
+                  <div className="meeting-row-tags">
+                    <span className="badge badge-subtle">
+                      <Target size={12} /> {m.decisions_count || 0} decisions
+                    </span>
+                    <span className="badge badge-subtle">
+                      <CheckSquare size={12} /> {m.actions_count || 0} action items
+                    </span>
+                    {(m.topics || []).map((top) => (
+                      <span key={top} className="badge badge-topic">
+                        #{top}
                       </span>
-                    </td>
-                    <td><code>{m.source_type}</code></td>
-                    <td>
-                      <StatusBadge status={m.processing_status} />
-                    </td>
-                    <td>{m.segment_count}</td>
-                    <td>{new Date(m.created_at).toLocaleString()}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
+                    ))}
+                  </div>
+                </div>
 
-      {/* Ingestion Modal */}
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Upload and Ingest Meeting">
-        <form onSubmit={handleSubmit}>
-          {submitError && (
-            <div className="error-state" style={{ marginBottom: "16px" }}>
-              <AlertCircle size={16} />
-              <span>{submitError}</span>
+                <div className="meeting-row-actions">
+                  <button
+                    type="button"
+                    className="btn-icon text-muted"
+                    onClick={(e) => handleDeleteMeeting(e, m.meeting_id)}
+                    title="Delete meeting"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                  <ArrowRight size={16} className="text-muted row-arrow" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <div className="meetings-grid-layout">
+          {filteredMeetings.map((m) => (
+            <div
+              key={m.meeting_id}
+              className="meeting-grid-card"
+              onClick={() => navigate(`/meetings/${m.meeting_id}`)}
+            >
+              <div className="meeting-card-top">
+                <span className="meeting-card-date">
+                  {new Date(m.meeting_date).toLocaleDateString(undefined, {
+                    month: "short",
+                    day: "numeric",
+                    year: "numeric",
+                  })}
+                </span>
+                <span className="badge badge-subtle">
+                  {m.participant_count} participants
+                </span>
+              </div>
+
+              <h3 className="meeting-card-title">{m.title}</h3>
+
+              <p className="meeting-card-summary">
+                {m.summary
+                  ? m.summary.length > 130
+                    ? m.summary.slice(0, 127) + "..."
+                    : m.summary
+                  : "Text meeting content and notes."}
+              </p>
+
+              <div className="meeting-card-badges">
+                <span className="badge badge-subtle">{m.decisions_count || 0} decisions</span>
+                <span className="badge badge-subtle">{m.actions_count || 0} actions</span>
+              </div>
+
+              {m.topics && m.topics.length > 0 && (
+                <div className="meeting-card-topics">
+                  {m.topics.slice(0, 2).map((top) => (
+                    <span key={top} className="badge badge-topic">
+                      #{top}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
-          )}
-          <div className="form-group">
-            <label className="form-label">Meeting Title *</label>
-            <input
-              type="text"
-              className="form-input"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="e.g. Sprint Sync"
-              required
-            />
-          </div>
-          <div className="form-group">
-            <label className="form-label">Meeting Date (YYYY-MM-DD or ISO)</label>
-            <input
-              type="text"
-              className="form-input"
-              value={meetingDate}
-              onChange={(e) => setMeetingDate(e.target.value)}
-              placeholder="e.g. 2026-08-25"
-            />
-          </div>
-          <div className="form-group">
-            <label className="form-label">Participants (comma separated)</label>
-            <input
-              type="text"
-              className="form-input"
-              value={participants}
-              onChange={(e) => setParticipants(e.target.value)}
-              placeholder="e.g. Sarah Connor, John Connor"
-            />
-          </div>
-          <div className="form-group">
-            <label className="form-label">Source File * (.wav, .mp3, .srt, .txt, .mp4)</label>
-            <input
-              type="file"
-              className="form-input"
-              onChange={handleFileChange}
-              accept=".wav,.mp3,.srt,.txt,.mp4"
-              required
-            />
-          </div>
-          <div className="form-group" style={{ flexDirection: "row", alignItems: "center", gap: "10px", marginTop: "10px" }}>
-            <input
-              type="checkbox"
-              id="asyncCheckboxMeetings"
-              checked={asyncProcessing}
-              onChange={(e) => setAsyncProcessing(e.target.checked)}
-            />
-            <label htmlFor="asyncCheckboxMeetings" className="form-label" style={{ margin: 0, cursor: "pointer" }}>
-              Process asynchronously via Celery Queue
-            </label>
-          </div>
-
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: "12px", marginTop: "24px" }}>
-            <button type="button" className="btn btn-outline" onClick={() => setIsModalOpen(false)} disabled={submitting}>
-              Cancel
-            </button>
-            <button type="submit" className="btn btn-primary" disabled={submitting}>
-              {submitting ? "Uploading..." : "Start Ingestion"}
-            </button>
-          </div>
-        </form>
-      </Modal>
+          ))}
+        </div>
+      )}
     </div>
-  )
-}
-export default MeetingsList
+  );
+};
+
+export default MeetingsList;

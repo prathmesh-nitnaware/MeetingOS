@@ -80,7 +80,9 @@ class MeetingMetadata(BaseSchema):
     audio_sample_rate_hz: int | None = Field(default=None, gt=0)
     audio_channels: int | None = Field(default=None, gt=0)
     audio_duration_seconds: float | None = Field(default=None, ge=0.0)
-    model_pipeline_version: str = "1.0.0"
+    model_pipeline_version: str = "2.0.0"
+    content_type: str = "transcript"
+    project_id: str | None = None
     extra: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -91,8 +93,13 @@ class Meeting(BaseSchema):
     title: str = Field(..., min_length=1, max_length=500)
     meeting_date: datetime
     duration_seconds: float | None = Field(default=None, ge=0.0)
-    source_type: SourceType = SourceType.AUDIO_WAV
+    source_type: SourceType = SourceType.TEXT_TRANSCRIPT
     processing_status: ProcessingStatus = ProcessingStatus.QUEUED
+    content_type: str = "transcript"
+    content: str | None = None
+    summary: str | None = None
+    key_points: list[str] = Field(default_factory=list)
+    project_id: str | None = None
     participants: list[Participant] = Field(default_factory=list)
     speakers: list[SpeakerInfo] = Field(default_factory=list)
     segments: list[TranscriptSegment] = Field(default_factory=list)
@@ -194,15 +201,35 @@ class NormalizedTemporal(BaseSchema):
         return v
 
 
+class Project(BaseSchema):
+    """Project grouping meetings, decisions, and action items."""
+
+    id: str = Field(default_factory=lambda: str(uuid4()))
+    org_id: str = "org_dev"
+    name: str = Field(..., min_length=1, max_length=255)
+    description: str | None = None
+    color: str | None = "#4f46e5"
+    status: str = "active"
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
 class ExtractedDecision(BaseSchema):
     """Decision extracted from meeting with lifecycle state."""
 
     decision_id: str = Field(default_factory=lambda: str(uuid4()))
+    title: str | None = None
     subject: str = Field(..., min_length=1)
-    status: DecisionStatus = DecisionStatus.PROPOSED
+    status: DecisionStatus = DecisionStatus.APPROVED
+    context: str | None = None
     rationale: str | None = None
+    confidence: float = Field(default=1.0, ge=0.0, le=1.0)
     meeting_id: str
     evidence_segment_id: str | None = None
+    source_text: str | None = None
+    source_start: int | None = None
+    source_end: int | None = None
+    review_status: str = "needs_review"
     created_at: datetime = Field(default_factory=utc_now)
 
 
@@ -210,13 +237,21 @@ class ExtractedCommitment(BaseSchema):
     """Action or commitment assigned with deadlines."""
 
     commitment_id: str = Field(default_factory=lambda: str(uuid4()))
+    task: str | None = None
     description: str = Field(..., min_length=1)
     owner_id: str | None = None
-    status: CommitmentStatus = CommitmentStatus.IDENTIFIED
+    status: CommitmentStatus = CommitmentStatus.IN_PROGRESS
+    priority: str = "medium"
+    due_date_str: str | None = None
+    confidence: float = Field(default=1.0, ge=0.0, le=1.0)
     original_deadline: datetime | None = None
     current_deadline: datetime | None = None
     meeting_id: str
     evidence_segment_id: str | None = None
+    source_text: str | None = None
+    source_start: int | None = None
+    source_end: int | None = None
+    review_status: str = "needs_review"
 
 
 class ExtractedIssue(BaseSchema):
