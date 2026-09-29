@@ -72,7 +72,14 @@ async def init_db(engine: AsyncEngine) -> None:
                 await conn.execute(text("ALTER TABLE meetings ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP WITH TIME ZONE;"))
                 await conn.execute(text("ALTER TABLE meetings ADD COLUMN IF NOT EXISTS deleted_by VARCHAR(100);"))
 
+                # Topics table columns
+                await conn.execute(text("ALTER TABLE topics ADD COLUMN IF NOT EXISTS source_text TEXT;"))
+                await conn.execute(text("ALTER TABLE topics ADD COLUMN IF NOT EXISTS confidence FLOAT DEFAULT 1.0;"))
+
                 # Decisions table columns
+                await conn.execute(text("ALTER TABLE decisions ADD COLUMN IF NOT EXISTS title VARCHAR(500);"))
+                await conn.execute(text("ALTER TABLE decisions ADD COLUMN IF NOT EXISTS context TEXT;"))
+                await conn.execute(text("ALTER TABLE decisions ADD COLUMN IF NOT EXISTS confidence FLOAT DEFAULT 1.0;"))
                 await conn.execute(text("ALTER TABLE decisions ADD COLUMN IF NOT EXISTS project_id VARCHAR(100);"))
                 await conn.execute(text("ALTER TABLE decisions ADD COLUMN IF NOT EXISTS review_status VARCHAR(50) DEFAULT 'needs_review';"))
                 await conn.execute(text("ALTER TABLE decisions ADD COLUMN IF NOT EXISTS source_text TEXT;"))
@@ -80,12 +87,18 @@ async def init_db(engine: AsyncEngine) -> None:
                 await conn.execute(text("ALTER TABLE decisions ADD COLUMN IF NOT EXISTS source_end INT;"))
 
                 # Commitments table columns
+                await conn.execute(text("ALTER TABLE commitments ADD COLUMN IF NOT EXISTS priority VARCHAR(20) DEFAULT 'medium';"))
+                await conn.execute(text("ALTER TABLE commitments ADD COLUMN IF NOT EXISTS due_date_str VARCHAR(100);"))
+                await conn.execute(text("ALTER TABLE commitments ADD COLUMN IF NOT EXISTS confidence FLOAT DEFAULT 1.0;"))
                 await conn.execute(text("ALTER TABLE commitments ADD COLUMN IF NOT EXISTS project_id VARCHAR(100);"))
                 await conn.execute(text("ALTER TABLE commitments ADD COLUMN IF NOT EXISTS review_status VARCHAR(50) DEFAULT 'needs_review';"))
                 await conn.execute(text("ALTER TABLE commitments ADD COLUMN IF NOT EXISTS task TEXT;"))
                 await conn.execute(text("ALTER TABLE commitments ADD COLUMN IF NOT EXISTS source_text TEXT;"))
                 await conn.execute(text("ALTER TABLE commitments ADD COLUMN IF NOT EXISTS source_start INT;"))
                 await conn.execute(text("ALTER TABLE commitments ADD COLUMN IF NOT EXISTS source_end INT;"))
+                await conn.execute(text("ALTER TABLE commitments ADD COLUMN IF NOT EXISTS original_deadline TIMESTAMP WITH TIME ZONE;"))
+                await conn.execute(text("ALTER TABLE commitments ADD COLUMN IF NOT EXISTS current_deadline TIMESTAMP WITH TIME ZONE;"))
+                await conn.execute(text("ALTER TABLE commitments ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW();"))
         except Exception:
             pass
 

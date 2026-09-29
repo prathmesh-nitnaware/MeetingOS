@@ -475,7 +475,7 @@ export type EntityTimelineResponse = any;
 const API_BASE_URL = "/api/v1";
 
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-  const token = localStorage.getItem("meetingos_token") || "mock-token-org-dev";
+  const token = localStorage.getItem("meetingos_token") || "admin-secret-token";
   const orgId = localStorage.getItem("meetingos_org_id") || "org_dev";
 
   const headers: Record<string, string> = {

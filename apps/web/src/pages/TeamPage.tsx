@@ -108,7 +108,7 @@ export const TeamPage: React.FC = () => {
           Loading team roster...
         </div>
       ) : error ? (
-        <div style={{ padding: "2rem", background: "#fef2f2", border: "1px solid #fecaca", borderRadius: "8px", color: "#991b1b" }}>
+        <div style={{ padding: "1.25rem 1.5rem", background: "#450a0a", border: "1px solid #7f1d1d", borderRadius: "8px", color: "#fca5a5", fontSize: "13.5px" }}>
           {error}
         </div>
       ) : filteredMembers.length === 0 ? (

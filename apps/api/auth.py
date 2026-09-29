@@ -172,6 +172,15 @@ DEV_TOKENS = {
         full_name="Dev Owner",
         permissions=sorted(ROLE_PERMISSIONS["owner"]),
     ),
+    # Default token alias used in web client fallback
+    "mock-token-org-dev": UserIdentity(
+        user_id="admin-dev",
+        org_id="org_dev",
+        role="admin",
+        email="admin@meetingos.local",
+        full_name="Dev Admin",
+        permissions=sorted(ROLE_PERMISSIONS["admin"]),
+    ),
     # Second dev tenant — useful for cross-org isolation testing
     "admin-beta-token": UserIdentity(
         user_id="admin-beta",
