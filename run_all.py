@@ -270,6 +270,7 @@ def main() -> None:
     if not args.no_worker:
         redis_available = check_port_open("localhost", 6379, timeout=0.5)
         if redis_available:
+            pool_args = ["--pool=solo"] if sys.platform == "win32" else []
             celery_cmd = (
                 [
                     uv_bin,
@@ -282,6 +283,7 @@ def main() -> None:
                     "-Q",
                     "meetingos.asr,meetingos.nlp,meetingos.embedding,meetingos.sync",
                 ]
+                + pool_args
                 if uv_bin
                 else [
                     sys.executable,
@@ -294,6 +296,7 @@ def main() -> None:
                     "-Q",
                     "meetingos.asr,meetingos.nlp,meetingos.embedding,meetingos.sync",
                 ]
+                + pool_args
             )
             spawn_process("CELERY", celery_cmd, ROOT_DIR, MAGENTA)
         else:
