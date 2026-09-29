@@ -205,63 +205,47 @@ export const Dashboard: React.FC = () => {
 
       {/* What Changed? Activity Feed Banner */}
       {activities.length > 0 && (
-        <div style={{ background: "white", padding: "1.5rem", borderRadius: "10px", border: "1px solid var(--color-border)", marginBottom: "1.5rem" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
+        <div className="dashboard-section" style={{ marginBottom: "24px" }}>
+          <div className="section-header">
             <div>
-              <h2 style={{ fontSize: "1.125rem", fontWeight: "700", color: "var(--color-text-main)", margin: 0, display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                <Activity size={18} style={{ color: "var(--color-primary-600)" }} />
+              <h2 className="section-title" style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                <Activity size={16} style={{ color: "var(--accent-primary)" }} />
                 What Changed?
               </h2>
-              <p style={{ color: "var(--color-text-muted)", fontSize: "0.8125rem", margin: "0.25rem 0 0 0" }}>
+              <p className="section-subtitle">
                 Recent activity across your organization's meetings, decisions, and action items
               </p>
             </div>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "0.75rem" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "10px" }}>
             {activities.slice(0, 4).map((act, i) => (
               <div
                 key={i}
                 onClick={() => act.meeting_id && navigate(`/meetings/${act.meeting_id}`)}
-                style={{
-                  padding: "0.875rem 1rem",
-                  borderRadius: "8px",
-                  background: "#f8fafc",
-                  border: "1px solid #e2e8f0",
-                  cursor: act.meeting_id ? "pointer" : "default",
-                  display: "flex",
-                  flexDirection: "column",
-                  justifyContent: "space-between",
-                  gap: "0.5rem",
-                  transition: "all 0.15s ease"
-                }}
+                className="dashboard-meeting-card"
+                style={{ cursor: act.meeting_id ? "pointer" : "default" }}
               >
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "0.5rem" }}>
                   <span
-                    style={{
-                      fontSize: "0.7rem",
-                      fontWeight: "700",
-                      textTransform: "uppercase",
-                      padding: "0.15rem 0.45rem",
-                      borderRadius: "4px",
-                      background: act.type === "meeting_analyzed" ? "#e0e7ff" : act.type === "decision_added" ? "#dcfce7" : "#fef3c7",
-                      color: act.type === "meeting_analyzed" ? "#4338ca" : act.type === "decision_added" ? "#15803d" : "#b45309"
-                    }}
+                    className={`activity-type-badge ${act.type === "meeting_analyzed" ? "meeting" : act.type === "decision_added" ? "decision" : "action"}`}
                   >
-                    {act.type === "meeting_analyzed" ? "Meeting Analyzed" : act.type === "decision_added" ? "Decision Recorded" : "Action Created"}
+                    {act.type === "meeting_analyzed" ? "Meeting" : act.type === "decision_added" ? "Decision" : "Action"}
                   </span>
-                  <span style={{ fontSize: "0.75rem", color: "var(--color-text-muted)" }}>
+                  <span style={{ fontSize: "11px", color: "var(--text-muted)" }}>
                     {act.timestamp ? new Date(act.timestamp).toLocaleDateString() : "Recent"}
                   </span>
                 </div>
 
-                <div style={{ fontSize: "0.875rem", fontWeight: "600", color: "var(--color-text-main)", lineHeight: 1.4 }}>
+                <div style={{ fontSize: "13px", fontWeight: 600, color: "var(--text-primary)", lineHeight: 1.4 }}>
                   {act.title}
                 </div>
 
-                <div style={{ fontSize: "0.75rem", color: "var(--color-primary-600)", fontWeight: "500", display: "flex", alignItems: "center", gap: "0.25rem" }}>
-                  {act.meeting_title || "View Source"} →
-                </div>
+                {act.meeting_title && (
+                  <div style={{ fontSize: "11.5px", color: "var(--accent-primary)", fontWeight: 500 }}>
+                    {act.meeting_title} →
+                  </div>
+                )}
               </div>
             ))}
           </div>
