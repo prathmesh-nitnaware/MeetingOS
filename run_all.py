@@ -79,6 +79,16 @@ def check_port_open(host: str, port: int, timeout: float = 1.0) -> bool:
         return s.connect_ex((host, port)) == 0
 
 
+def wait_for_port(host: str, port: int, max_wait_seconds: float = 15.0) -> bool:
+    """Poll until a TCP port is ready and listening."""
+    start_time = time.time()
+    while time.time() - start_time < max_wait_seconds:
+        if check_port_open(host, port, timeout=0.3):
+            return True
+        time.sleep(0.3)
+    return False
+
+
 def stream_output(prefix: str, color: str, pipe) -> None:
     """Stream stdout/stderr of a child process with a colored prefix."""
     try:
@@ -304,6 +314,12 @@ def main() -> None:
 
     # 5. Start Frontend Web Server (Vite on port 5173)
     if not args.no_web:
+        log("API", "Waiting for API server to become ready on port 8000...", CYAN)
+        if wait_for_port("127.0.0.1", 8000, max_wait_seconds=20.0):
+            log("API", "API server is ready.", GREEN)
+        else:
+            log("API", "API server startup taking longer than expected, starting web frontend...", YELLOW)
+
         if WEB_DIR.exists() and npm_bin:
             spawn_process("WEB", [npm_bin, "run", "dev"], WEB_DIR, GREEN)
         else:
