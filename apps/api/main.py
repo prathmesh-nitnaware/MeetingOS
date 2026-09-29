@@ -35,12 +35,13 @@ async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info(
         "Starting %s v%s in %s mode", settings.app_name, settings.app_version, settings.app_env
     )
-    try:
-        engine = get_engine(settings.database_url)
-        await init_db(engine)
-        logger.info("Database schema initialized successfully.")
-    except Exception as exc:
-        logger.warning("Database schema auto-initialization skipped or deferred: %s", exc)
+    if "sqlite" in settings.database_url:
+        try:
+            engine = get_engine(settings.database_url)
+            await init_db(engine)
+            logger.info("SQLite database schema initialized.")
+        except Exception as exc:
+            logger.warning("Database schema auto-initialization skipped: %s", exc)
 
     yield
     logger.info("Shutting down %s", settings.app_name)

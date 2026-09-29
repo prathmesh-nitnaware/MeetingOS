@@ -89,6 +89,24 @@ def wait_for_port(host: str, port: int, max_wait_seconds: float = 15.0) -> bool:
     return False
 
 
+def wait_for_api_healthy(url: str = "http://127.0.0.1:8000/api/v1/health", max_wait_seconds: float = 20.0) -> bool:
+    """Poll the API health endpoint until it returns HTTP 200 OK."""
+    import urllib.request
+
+    start_time = time.time()
+    while time.time() - start_time < max_wait_seconds:
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "MeetingOS-Runner/1.0"})
+            with urllib.request.urlopen(req, timeout=1.0) as resp:
+                if resp.status == 200:
+                    return True
+        except Exception:
+            pass
+        time.sleep(0.4)
+    return False
+
+
+
 def stream_output(prefix: str, color: str, pipe) -> None:
     """Stream stdout/stderr of a child process with a colored prefix."""
     try:
@@ -314,11 +332,11 @@ def main() -> None:
 
     # 5. Start Frontend Web Server (Vite on port 5173)
     if not args.no_web:
-        log("API", "Waiting for API server to become ready on port 8000...", CYAN)
-        if wait_for_port("127.0.0.1", 8000, max_wait_seconds=20.0):
-            log("API", "API server is ready.", GREEN)
+        log("API", "Waiting for FastAPI health check (http://127.0.0.1:8000/api/v1/health)...", CYAN)
+        if wait_for_api_healthy("http://127.0.0.1:8000/api/v1/health", max_wait_seconds=30.0):
+            log("API", "FastAPI backend is live and responding with HTTP 200.", GREEN)
         else:
-            log("API", "API server startup taking longer than expected, starting web frontend...", YELLOW)
+            log("API", "FastAPI startup taking longer than expected, starting web frontend...", YELLOW)
 
         if WEB_DIR.exists() and npm_bin:
             spawn_process("WEB", [npm_bin, "run", "dev"], WEB_DIR, GREEN)
