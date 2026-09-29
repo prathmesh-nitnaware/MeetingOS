@@ -1,4 +1,4 @@
-﻿"""002_add_org_id_to_meetings
+"""002_add_org_id_to_meetings
 
 Revision ID: 002_add_org_id_to_meetings
 Revises: 001_initial_schema
@@ -22,20 +22,33 @@ LEGACY_ORG_ID = 'org_legacy'
 
 
 def upgrade() -> None:
-    op.add_column(
-        'meetings',
-        sa.Column('org_id', sa.String(length=64), nullable=True),
-    )
-    op.execute(
-        sa.text('UPDATE meetings SET org_id = :oid WHERE org_id IS NULL').bindparams(oid=LEGACY_ORG_ID)
-    )
-    op.alter_column('meetings', 'org_id', nullable=False)
-    op.create_index('ix_meetings_org_id', 'meetings', ['org_id'], unique=False)
-    op.create_index('ix_meetings_org_id_date', 'meetings', ['org_id', 'meeting_date'], unique=False)
+    bind = op.get_bind()
+    insp = sa.inspect(bind)
+    existing_tables = set(insp.get_table_names())
+    if 'meetings' in existing_tables:
+        meeting_cols = {c['name'] for c in insp.get_columns('meetings')}
+        if 'org_id' not in meeting_cols:
+            op.add_column(
+                'meetings',
+                sa.Column('org_id', sa.String(length=64), nullable=True),
+            )
+            op.execute(
+                sa.text('UPDATE meetings SET org_id = :oid WHERE org_id IS NULL').bindparams(oid=LEGACY_ORG_ID)
+            )
+            op.alter_column('meetings', 'org_id', nullable=False)
+            op.create_index('ix_meetings_org_id', 'meetings', ['org_id'], unique=False)
+            op.create_index('ix_meetings_org_id_date', 'meetings', ['org_id', 'meeting_date'], unique=False)
 
 
 def downgrade() -> None:
-    op.drop_index('ix_meetings_org_id_date', table_name='meetings')
-    op.drop_index('ix_meetings_org_id', table_name='meetings')
-    op.drop_column('meetings', 'org_id')
+    bind = op.get_bind()
+    insp = sa.inspect(bind)
+    existing_tables = set(insp.get_table_names())
+    if 'meetings' in existing_tables:
+        meeting_cols = {c['name'] for c in insp.get_columns('meetings')}
+        if 'org_id' in meeting_cols:
+            op.drop_index('ix_meetings_org_id_date', table_name='meetings')
+            op.drop_index('ix_meetings_org_id', table_name='meetings')
+            op.drop_column('meetings', 'org_id')
+
 
