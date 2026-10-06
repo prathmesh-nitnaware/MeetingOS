@@ -5,7 +5,13 @@ from packages.reasoning.interfaces import BaseReasoner
 
 
 class MockReasoner(BaseReasoner):
-    """Deterministic Mock Reasoner producing grounded answers with citations."""
+    """Deterministic test reasoner that only quotes the retrieved evidence.
+
+    It never states facts that are not in the evidence (earlier versions returned hard-coded
+    answers such as "the team adopted PostgreSQL" for any question mentioning a database).
+    """
+
+    model_name = "mock-reasoner"
 
     async def reason(
         self,
@@ -24,27 +30,16 @@ class MockReasoner(BaseReasoner):
                 reasoning_path=["No retrieved evidence segments matched the query criteria."],
             )
 
-        # Build deterministic synthesis from evidence
-        evidence_texts = " ".join(e.text_snapshot for e in evidence)
-        lowered_q = question.lower()
-
-        if "database" in lowered_q or "postgres" in lowered_q or "mongodb" in lowered_q:
-            answer = (
-                "Based on the meeting records, the team evaluated MongoDB and PostgreSQL, and decided "
-                "to adopt PostgreSQL with pgvector as the official database."
-            )
-        elif "rahul" in lowered_q or "schema" in lowered_q or "friday" in lowered_q:
-            answer = "Rahul Verma committed to finishing the database schema by Friday as agreed during the meeting."
-        else:
-            answer = f"According to the retrieved evidence: {evidence_texts[:200]}..."
-
+        quoted = " ".join(e.text_snapshot.strip() for e in evidence[:3])
+        if len(quoted) > 300:
+            quoted = quoted[:297].rstrip() + "..."
         return AnswerWithAttribution(
             question=question,
-            answer=answer,
+            answer=f"According to the retrieved evidence: {quoted}",
             evidence=list(evidence),
             confidence=0.95,
             reasoning_path=[
                 f"Retrieved {len(evidence)} evidence segments.",
-                "Grounded factual claims in source timestamps.",
+                "Quoted the evidence verbatim (mock reasoner).",
             ],
         )

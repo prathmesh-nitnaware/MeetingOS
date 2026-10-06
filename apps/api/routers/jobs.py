@@ -1,11 +1,13 @@
 from datetime import datetime
 
+from apps.api.auth import UserIdentity, require_viewer
 from apps.api.config import settings
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from packages.common.enums import ProcessingStatus
 from packages.memory.database import get_db_session
-from packages.memory.repository import MeetingRepository
+from packages.memory.models import JobModel, MeetingModel
 from pydantic import BaseModel
+from sqlalchemy import or_, select
 
 router = APIRouter(prefix="/jobs", tags=["Jobs"])
 
@@ -22,17 +24,28 @@ class JobDetailResponse(BaseModel):
 
 
 @router.get("/{job_id}", response_model=JobDetailResponse)
-async def get_job_status(job_id: str) -> JobDetailResponse:
-    """Retrieve asynchronous processing job status, progress, and stage."""
+async def get_job_status(
+    job_id: str,
+    user: UserIdentity = Depends(require_viewer),
+) -> JobDetailResponse:
+    """Retrieve processing job status, progress, and stage for the caller's organisation."""
+    stmt = (
+        select(JobModel)
+        .outerjoin(MeetingModel, MeetingModel.id == JobModel.meeting_id)
+        .where(
+            JobModel.id == job_id,
+            or_(
+                JobModel.org_id == user.org_id,
+                # Jobs created before jobs.org_id existed are scoped through their meeting
+                (JobModel.org_id.is_(None)) & (MeetingModel.org_id == user.org_id),
+            ),
+        )
+    )
     async with get_db_session(settings.database_url) as session:
-        repo = MeetingRepository(session)
-        job = await repo.get_job(job_id)
+        job = (await session.execute(stmt)).scalar_one_or_none()
 
     if not job:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Job with ID '{job_id}' not found.",
-        )
+        raise HTTPException(status_code=404, detail=f"Job with ID '{job_id}' not found.")
 
     return JobDetailResponse(
         job_id=job.id,

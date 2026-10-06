@@ -46,9 +46,18 @@ from packages.memory.models import (
     UtteranceClassificationModel,
 )
 from packages.nlp.pipeline import NLPExtractionResult
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 from sqlalchemy.orm import selectinload
+
+# model_name tags telling apart NLP-extracted events from temporal reconciliation events
+NLP_EVENT_MODEL_NAME = "nlp-event-extractor"
+RECONCILER_MODEL_NAME = "temporal-reconciler"
+
+# Lifecycle states that only cross-meeting reconciliation assigns; re-extraction keeps them
+_RECONCILED_DECISION_STATES = {str(DecisionStatus.REVERSED), str(DecisionStatus.MODIFIED)}
+_RECONCILED_COMMITMENT_STATES = {str(CommitmentStatus.OVERDUE), str(CommitmentStatus.REASSIGNED)}
+_RECONCILED_ISSUE_STATES = {str(IssueStatus.RESOLVED), str(IssueStatus.RECURRING)}
 
 
 async def init_db(engine: AsyncEngine) -> None:
@@ -192,6 +201,60 @@ class MeetingRepository:
             created_at=meeting_row.created_at,
             updated_at=meeting_row.updated_at,
         )
+
+    async def list_meeting_summaries(
+        self, org_id: str, limit: int = 50, offset: int = 0
+    ) -> tuple[list[dict[str, Any]], int]:
+        """Lightweight meeting listing: counts are computed in SQL instead of loading transcripts.
+
+        Returns (rows, total_count) for the organisation's non-deleted meetings.
+        """
+        segment_count = (
+            select(func.count(TranscriptSegmentModel.id))
+            .where(TranscriptSegmentModel.meeting_id == MeetingModel.id)
+            .correlate(MeetingModel)
+            .scalar_subquery()
+        )
+        participant_count = (
+            select(func.count(ParticipantModel.id))
+            .where(ParticipantModel.meeting_id == MeetingModel.id)
+            .correlate(MeetingModel)
+            .scalar_subquery()
+        )
+        speaker_count = (
+            select(func.count(SpeakerModel.id))
+            .where(SpeakerModel.meeting_id == MeetingModel.id)
+            .correlate(MeetingModel)
+            .scalar_subquery()
+        )
+        visible = (MeetingModel.org_id == org_id) & MeetingModel.deleted_at.is_(None)
+        stmt = (
+            select(MeetingModel, segment_count, participant_count, speaker_count)
+            .where(visible)
+            .order_by(MeetingModel.meeting_date.desc(), MeetingModel.created_at.desc())
+            .limit(limit)
+            .offset(offset)
+        )
+        rows = []
+        for meeting, seg_n, part_n, spk_n in (await self.session.execute(stmt)).all():
+            rows.append(
+                {
+                    "meeting_id": meeting.id,
+                    "title": meeting.title,
+                    "meeting_date": meeting.meeting_date,
+                    "duration_seconds": meeting.duration_seconds,
+                    "source_type": meeting.source_type,
+                    "processing_status": meeting.processing_status,
+                    "participant_count": part_n or 0,
+                    "speaker_count": spk_n or 0,
+                    "segment_count": seg_n or 0,
+                    "created_at": meeting.created_at,
+                }
+            )
+        total = (
+            await self.session.execute(select(func.count(MeetingModel.id)).where(visible))
+        ).scalar() or 0
+        return rows, total
 
     async def list_meetings(
         self, org_id: str = "org_dev", limit: int = 50, offset: int = 0
@@ -350,8 +413,56 @@ class MeetingRepository:
         meeting_id: str,
         results: NLPExtractionResult,
     ) -> None:
-        """Persist entities, topics, decisions, commitments, issues, events, and relations in an atomic transaction."""
-        # 1. Clean existing facts for this meeting
+        """Persist entities, topics, decisions, commitments, issues, events, and relations.
+
+        Safe to call again for the same meeting (re-extraction): facts keep their stable IDs,
+        lifecycle state assigned by cross-meeting reconciliation (reversed, overdue, resolved,
+        recurring, moved deadlines) is carried over, and reconciliation events are left alone.
+        """
+        # 0. Remember reconciliation-assigned lifecycle state before replacing the rows
+        # (column selects, not ORM objects, so the rows re-inserted below with the same IDs
+        # never collide with stale instances in the session identity map)
+        kept_decisions = {
+            dec_id: status_value
+            for dec_id, status_value in (
+                await self.session.execute(
+                    select(DecisionModel.id, DecisionModel.status).where(
+                        DecisionModel.meeting_id == meeting_id
+                    )
+                )
+            ).all()
+            if status_value in _RECONCILED_DECISION_STATES
+        }
+        kept_commitments = {
+            com_id: (status_value, current_dl)
+            for com_id, status_value, current_dl, original_dl in (
+                await self.session.execute(
+                    select(
+                        CommitmentModel.id,
+                        CommitmentModel.status,
+                        CommitmentModel.current_deadline,
+                        CommitmentModel.original_deadline,
+                    ).where(CommitmentModel.meeting_id == meeting_id)
+                )
+            ).all()
+            if status_value in _RECONCILED_COMMITMENT_STATES or current_dl != original_dl
+        }
+        kept_issues = {
+            iss_id: (status_value, resolution_id, last_mentioned)
+            for iss_id, status_value, resolution_id, last_mentioned in (
+                await self.session.execute(
+                    select(
+                        IssueModel.id,
+                        IssueModel.status,
+                        IssueModel.resolution_meeting_id,
+                        IssueModel.last_mentioned_at,
+                    ).where(IssueModel.meeting_id == meeting_id)
+                )
+            ).all()
+            if status_value in _RECONCILED_ISSUE_STATES
+        }
+
+        # 1. Clean existing extracted facts for this meeting
         await self.session.execute(
             delete(MeetingEntityModel).where(MeetingEntityModel.meeting_id == meeting_id)
         )
@@ -363,7 +474,12 @@ class MeetingRepository:
             delete(CommitmentModel).where(CommitmentModel.meeting_id == meeting_id)
         )
         await self.session.execute(delete(IssueModel).where(IssueModel.meeting_id == meeting_id))
-        await self.session.execute(delete(EventModel).where(EventModel.meeting_id == meeting_id))
+        await self.session.execute(
+            delete(EventModel).where(
+                EventModel.meeting_id == meeting_id,
+                EventModel.model_name != RECONCILER_MODEL_NAME,
+            )
+        )
         await self.session.execute(
             delete(RelationshipModel).where(RelationshipModel.meeting_id == meeting_id)
         )
@@ -409,7 +525,7 @@ class MeetingRepository:
                     id=dec.decision_id,
                     meeting_id=meeting_id,
                     subject=dec.subject,
-                    status=str(dec.status),
+                    status=kept_decisions.get(dec.decision_id, str(dec.status)),
                     rationale=dec.rationale,
                     evidence_segment_id=dec.evidence_segment_id,
                     created_at=dec.created_at,
@@ -418,37 +534,58 @@ class MeetingRepository:
 
         # 5. Persist Commitments / Actions
         for com in results.commitments:
+            status_value, current_deadline = kept_commitments.get(
+                com.commitment_id, (str(com.status), com.current_deadline)
+            )
             self.session.add(
                 CommitmentModel(
                     id=com.commitment_id,
                     meeting_id=meeting_id,
                     description=com.description,
                     owner_id=com.owner_id,
-                    status=str(com.status),
+                    status=status_value,
                     original_deadline=com.original_deadline,
-                    current_deadline=com.current_deadline,
+                    current_deadline=current_deadline,
                     evidence_segment_id=com.evidence_segment_id,
                 )
             )
 
         # 6. Persist Issues
         for iss in results.issues:
+            status_value, resolution_meeting_id, last_mentioned_at = kept_issues.get(
+                iss.issue_id, (str(iss.status), iss.resolution_meeting_id, iss.last_mentioned_at)
+            )
             self.session.add(
                 IssueModel(
                     id=iss.issue_id,
                     meeting_id=meeting_id,
                     description=iss.description,
                     owner_id=iss.owner_id,
-                    status=str(iss.status),
+                    status=status_value,
                     first_detected_at=iss.first_detected_at,
-                    last_mentioned_at=iss.last_mentioned_at,
-                    resolution_meeting_id=iss.resolution_meeting_id,
+                    last_mentioned_at=last_mentioned_at,
+                    resolution_meeting_id=resolution_meeting_id,
                     evidence_segment_id=iss.evidence_segment_id,
                 )
             )
 
-        # 7. Persist Events
+        # 7. Persist Events (tagged so reconciliation events are never touched by re-extraction)
+        existing_event_ids = (
+            set(
+                (
+                    await self.session.execute(
+                        select(EventModel.id).where(
+                            EventModel.id.in_([evt.event_id for evt in results.events])
+                        )
+                    )
+                ).scalars()
+            )
+            if results.events
+            else set()
+        )
         for evt in results.events:
+            if evt.event_id in existing_event_ids:
+                continue
             self.session.add(
                 EventModel(
                     id=evt.event_id,
@@ -458,6 +595,7 @@ class MeetingRepository:
                     subject_entity_id=evt.subject_entity_id,
                     payload_json=evt.payload,
                     evidence_segment_id=evt.evidence_segment_id,
+                    model_name=NLP_EVENT_MODEL_NAME,
                 )
             )
 
@@ -710,11 +848,13 @@ class MeetingRepository:
         job_id: str,
         meeting_id: str | None = None,
         stage: str = "initialized",
+        org_id: str | None = None,
     ) -> JobModel:
-        """Create a job tracking record."""
+        """Create a job tracking record owned by ``org_id``."""
         job = JobModel(
             id=job_id,
             meeting_id=meeting_id,
+            org_id=org_id,
             status=str(ProcessingStatus.QUEUED),
             stage=stage,
             progress=0.0,
@@ -789,18 +929,38 @@ class MeetingRepository:
         await self.session.flush()
         return True
 
-    async def hard_delete_meeting(self, meeting_id: str, org_id: str = "org_dev") -> bool:
-        """Permanently remove a meeting and all cascading child records for a tenant."""
-        stmt = select(MeetingModel).where(
+    async def hard_delete_meeting(
+        self,
+        meeting_id: str,
+        org_id: str = "org_dev",
+        actor_id: str | None = None,
+        upload_storage_dir: str | None = None,
+    ) -> bool:
+        """Permanently remove a meeting, every row referencing it and its uploaded files."""
+        from packages.memory.retention import purge_meetings, remove_meeting_files
+
+        stmt = select(MeetingModel.id, MeetingModel.title).where(
             MeetingModel.id == meeting_id,
             MeetingModel.org_id == org_id,
         )
-        result = await self.session.execute(stmt)
-        meeting = result.scalar_one_or_none()
-        if not meeting:
+        row = (await self.session.execute(stmt)).first()
+        if not row:
             return False
 
-        await self.session.delete(meeting)
+        await purge_meetings(self.session, [meeting_id])
+        removed_files = remove_meeting_files(upload_storage_dir, org_id, meeting_id)
+        if actor_id:
+            self.session.add(
+                AuditLogModel(
+                    org_id=org_id,
+                    actor_id=actor_id,
+                    action="meeting.hard_deleted",
+                    resource_type="meeting",
+                    resource_id=meeting_id,
+                    outcome="succeeded",
+                    metadata_json={"title": row.title, "files_removed": removed_files},
+                )
+            )
         await self.session.flush()
         return True
 

@@ -5,7 +5,10 @@ from typing import Any
 from uuid import uuid4
 
 from packages.agents.context import AgentTraceItem
+from packages.memory.models import AgentTraceModel
 from pydantic import BaseModel, Field
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 
 def sanitize_trace_data(data: Any) -> Any:
@@ -51,6 +54,7 @@ class AgentExecutionTrace(BaseModel):
 
     trace_id: str = Field(default_factory=lambda: f"tr-{uuid4().hex[:12]}")
     query_id: str = Field(default_factory=lambda: f"qry-{uuid4().hex[:12]}")
+    org_id: str | None = None
     query: str
     answer: str
     confidence: float
@@ -87,15 +91,25 @@ class TraceStore:
 
         return clean_trace
 
-    def get_trace(self, trace_id: str) -> AgentExecutionTrace | None:
-        """Retrieve a specific trace by ID."""
+    def get_trace(self, trace_id: str, org_id: str | None = None) -> AgentExecutionTrace | None:
+        """Retrieve a specific trace by ID (only if it belongs to ``org_id`` when given)."""
         with self._lock:
-            return self._index.get(trace_id)
+            trace = self._index.get(trace_id)
+        if trace is not None and org_id is not None and trace.org_id != org_id:
+            return None
+        return trace
 
-    def list_traces(self, limit: int = 50, offset: int = 0) -> list[AgentExecutionTrace]:
-        """List recent execution traces."""
+    def list_traces(
+        self, limit: int = 50, offset: int = 0, org_id: str | None = None
+    ) -> list[AgentExecutionTrace]:
+        """List recent execution traces, optionally only those of one organisation."""
         with self._lock:
-            return self._traces[offset : offset + limit]
+            traces = (
+                list(self._traces)
+                if org_id is None
+                else [t for t in self._traces if t.org_id == org_id]
+            )
+        return traces[offset : offset + limit]
 
     def clear(self) -> None:
         with self._lock:
@@ -103,5 +117,54 @@ class TraceStore:
             self._index.clear()
 
 
-# Global Singleton Instance
+# Global Singleton Instance (per process; the database copy is shared across workers)
 global_trace_store = TraceStore()
+
+
+async def persist_trace(session: AsyncSession, trace: AgentExecutionTrace) -> None:
+    """Store a (sanitized) trace in the database inside a savepoint so failures stay isolated."""
+    if not trace.org_id:
+        return
+    async with session.begin_nested():
+        session.add(
+            AgentTraceModel(
+                id=trace.trace_id,
+                org_id=trace.org_id,
+                query=trace.query,
+                payload_json=trace.model_dump(mode="json"),
+                created_at=trace.created_at,
+            )
+        )
+
+
+async def load_traces(
+    session: AsyncSession, org_id: str, limit: int = 50, offset: int = 0
+) -> list[AgentExecutionTrace]:
+    """Most recent traces of one organisation, newest first."""
+    rows = (
+        (
+            await session.execute(
+                select(AgentTraceModel.payload_json)
+                .where(AgentTraceModel.org_id == org_id)
+                .order_by(AgentTraceModel.created_at.desc())
+                .limit(limit)
+                .offset(offset)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    return [AgentExecutionTrace.model_validate(payload) for payload in rows]
+
+
+async def load_trace(
+    session: AsyncSession, trace_id: str, org_id: str
+) -> AgentExecutionTrace | None:
+    payload = (
+        await session.execute(
+            select(AgentTraceModel.payload_json).where(
+                AgentTraceModel.id == trace_id, AgentTraceModel.org_id == org_id
+            )
+        )
+    ).scalar_one_or_none()
+    return AgentExecutionTrace.model_validate(payload) if payload else None

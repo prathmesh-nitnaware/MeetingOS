@@ -15,7 +15,7 @@ class AnthropicReasoner(BaseReasoner):
 
     def __init__(
         self,
-        model_name: str = "claude-3-5-sonnet-20241022",
+        model_name: str = "claude-opus-5-5",
         base_url: str = "https://api.anthropic.com/v1",
         api_key: str | None = None,
         max_retries: int = 3,

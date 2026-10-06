@@ -1,141 +1,149 @@
-import React, { useEffect, useState } from "react"
-import { Sliders, ShieldCheck, Sparkles, CheckCircle2, AlertCircle } from "lucide-react"
+import React, { useCallback, useEffect, useState } from "react"
+import { Mic, Sliders, Sparkles, Waypoints } from "lucide-react"
+import { Notice } from "../components/Notice"
+import { Spinner } from "../components/Spinner"
+import { api, type ProviderStatus } from "../services/api"
 
-interface ProviderStatus {
-  embedding_provider: string
-  embedding_model: string
-  embedding_configured: boolean
-  reasoner_provider: string
-  reasoner_model: string
-  reasoner_configured: boolean
-  has_fallback: boolean
-  environment: string
-}
+const LOCAL = new Set(["local", "local_evidence", "local_semantic", "real", "mock", "sentence_transformers", "st"])
+
+const Ready: React.FC<{ ok: boolean; okText: string; badText: string }> = ({ ok, okText, badText }) => (
+  <span className={`badge ${ok ? "badge-succeeded" : "badge-failed"}`}>{ok ? okText : badText}</span>
+)
 
 export const ProvidersSettings: React.FC = () => {
   const [status, setStatus] = useState<ProviderStatus | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    fetchStatus()
-  }, [])
-
-  const fetchStatus = async () => {
+  const load = useCallback(async () => {
+    setLoading(true)
+    setError(null)
     try {
-      setLoading(true)
-      const res = await fetch("/api/v1/admin/providers/status", {
-        headers: { Authorization: "Bearer viewer-secret-token" },
-      })
-      if (res.ok) {
-        const data = await res.json()
-        setStatus(data)
-      }
+      setStatus(await api.getProviderStatus())
     } catch (err) {
-      console.error("Failed to fetch provider status", err)
+      setError(err instanceof Error ? err.message : "Failed to load provider status.")
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    void load()
+  }, [load])
 
   return (
-    <div className="p-8 max-w-5xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight text-white flex items-center gap-3">
-          <Sliders className="text-indigo-400" />
-          AI Provider Settings & Health
-        </h1>
-        <p className="text-slate-400 mt-1">
-          Inspect model routing, embedding dimensions, fallback states, and security posture.
-        </p>
-      </div>
-
-      <div className="grid grid-cols-2 gap-6">
-        {/* Reasoning Engine Card */}
-        <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-6 space-y-4">
-          <div className="flex justify-between items-start">
-            <div className="flex items-center gap-2.5">
-              <Sparkles className="text-indigo-400" size={20} />
-              <h2 className="text-lg font-bold text-white">Reasoning Engine</h2>
-            </div>
-            {status?.reasoner_configured ? (
-              <span className="text-xs px-2.5 py-1 rounded-full bg-emerald-950/60 text-emerald-400 border border-emerald-800/40 flex items-center gap-1">
-                <CheckCircle2 size={12} /> Configured
-              </span>
-            ) : (
-              <span className="text-xs px-2.5 py-1 rounded-full bg-amber-950/60 text-amber-400 border border-amber-800/40 flex items-center gap-1">
-                <AlertCircle size={12} /> Local Fallback
-              </span>
-            )}
-          </div>
-
-          <div className="space-y-3 text-sm">
-            <div className="flex justify-between py-1.5 border-b border-slate-800">
-              <span className="text-slate-400">Provider</span>
-              <span className="font-mono text-slate-200 uppercase font-semibold">{status?.reasoner_provider || "LOCAL"}</span>
-            </div>
-            <div className="flex justify-between py-1.5 border-b border-slate-800">
-              <span className="text-slate-400">Active Model</span>
-              <span className="font-mono text-indigo-300">{status?.reasoner_model || "local-evidence-reasoner-v1"}</span>
-            </div>
-            <div className="flex justify-between py-1.5 border-b border-slate-800">
-              <span className="text-slate-400">Offline Fallback</span>
-              <span className="font-mono text-emerald-400">Active (LocalEvidenceReasoner)</span>
-            </div>
-            <div className="flex justify-between py-1.5">
-              <span className="text-slate-400">Structured Output</span>
-              <span className="font-mono text-slate-200">Strict JSON Schema</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Embedding Provider Card */}
-        <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-6 space-y-4">
-          <div className="flex justify-between items-start">
-            <div className="flex items-center gap-2.5">
-              <ShieldCheck className="text-indigo-400" size={20} />
-              <h2 className="text-lg font-bold text-white">Embedding Pipeline</h2>
-            </div>
-            {status?.embedding_configured ? (
-              <span className="text-xs px-2.5 py-1 rounded-full bg-emerald-950/60 text-emerald-400 border border-emerald-800/40 flex items-center gap-1">
-                <CheckCircle2 size={12} /> Ready
-              </span>
-            ) : (
-              <span className="text-xs px-2.5 py-1 rounded-full bg-amber-950/60 text-amber-400 border border-amber-800/40 flex items-center gap-1">
-                <AlertCircle size={12} /> Local Semantic
-              </span>
-            )}
-          </div>
-
-          <div className="space-y-3 text-sm">
-            <div className="flex justify-between py-1.5 border-b border-slate-800">
-              <span className="text-slate-400">Provider</span>
-              <span className="font-mono text-slate-200 uppercase font-semibold">{status?.embedding_provider || "LOCAL"}</span>
-            </div>
-            <div className="flex justify-between py-1.5 border-b border-slate-800">
-              <span className="text-slate-400">Embedding Model</span>
-              <span className="font-mono text-indigo-300">{status?.embedding_model || "local-semantic-v1"}</span>
-            </div>
-            <div className="flex justify-between py-1.5 border-b border-slate-800">
-              <span className="text-slate-400">Dimensions</span>
-              <span className="font-mono text-slate-200">384-dim (Dense)</span>
-            </div>
-            <div className="flex justify-between py-1.5">
-              <span className="text-slate-400">Caching Engine</span>
-              <span className="font-mono text-emerald-400">SHA-256 Segment Hash</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Security & Credentials Notice */}
-      <div className="bg-slate-900/40 border border-slate-800 rounded-xl p-5 text-xs text-slate-400 flex items-center gap-3">
-        <ShieldCheck size={20} className="text-emerald-400 shrink-0" />
+    <div>
+      <header className="page-header">
         <div>
-          <span className="font-semibold text-slate-200">Credential Leak Prevention:</span> API keys are stored exclusively in environment variables and are never transmitted to the browser, logs, or trace streams.
+          <h1 className="page-title with-icon">
+            <Sliders aria-hidden="true" /> AI Providers
+          </h1>
+          <p className="page-subtitle">
+            Which models answer questions, index meetings and transcribe audio. Configured in the server's .env file.
+          </p>
         </div>
-      </div>
+      </header>
+
+      {error && <Notice tone="error">{error}</Notice>}
+      {loading && !status && <Spinner message="Loading provider status..." />}
+
+      {status && (
+        <>
+          {status.reasoner_provider === "mock" && (
+            <Notice tone="info">
+              The reasoner is set to <code>mock</code>, which only quotes evidence. Set MEETINGOS_REASONER_PROVIDER to
+              <code> local</code>, <code>anthropic</code>, <code>openai</code> or <code>gemini</code> for real answers.
+            </Notice>
+          )}
+          {status.asr_provider === "mock" && (
+            <Notice tone="info">
+              Speech-to-text is set to <code>mock</code>: uploaded audio gets a canned demo transcript. Set ASR_PROVIDER=whisper.
+            </Notice>
+          )}
+
+          <div className="grid-3">
+            <section className="card">
+              <h2 className="card-title with-icon">
+                <Sparkles size={18} aria-hidden="true" /> Question answering
+              </h2>
+              <dl className="stat-list">
+                <div><dt>Provider</dt><dd><code>{status.reasoner_provider}</code></dd></div>
+                <div><dt>Model</dt><dd><code>{status.reasoner_model}</code></dd></div>
+                <div>
+                  <dt>Status</dt>
+                  <dd>
+                    <Ready ok={status.reasoner_configured} okText={LOCAL.has(status.reasoner_provider) ? "Runs locally" : "API key set"} badText="API key missing" />
+                  </dd>
+                </div>
+                {status.has_fallback && <div><dt>If the API fails</dt><dd>Falls back to the local evidence reasoner</dd></div>}
+              </dl>
+            </section>
+
+            <section className="card">
+              <h2 className="card-title with-icon">
+                <Waypoints size={18} aria-hidden="true" /> Search embeddings
+              </h2>
+              <dl className="stat-list">
+                <div><dt>Provider</dt><dd><code>{status.embedding_provider}</code></dd></div>
+                <div><dt>Model</dt><dd><code>{status.embedding_model}</code></dd></div>
+                <div>
+                  <dt>Status</dt>
+                  <dd>
+                    <Ready ok={status.embedding_configured} okText={LOCAL.has(status.embedding_provider) ? "Runs locally" : "API key set"} badText="API key missing" />
+                  </dd>
+                </div>
+              </dl>
+            </section>
+
+            <section className="card">
+              <h2 className="card-title with-icon">
+                <Mic size={18} aria-hidden="true" /> Speech-to-text
+              </h2>
+              <dl className="stat-list">
+                <div><dt>Provider</dt><dd><code>{status.asr_provider}</code></dd></div>
+                <div><dt>Model</dt><dd><code>{status.asr_model}</code></dd></div>
+                <div><dt>Device</dt><dd>{status.hardware_device}</dd></div>
+                <div><dt>Speaker separation</dt><dd>{status.diarizer_provider === "mock" ? "Demo names (mock)" : "Not available — one speaker"}</dd></div>
+                <div>
+                  <dt>Status</dt>
+                  <dd>
+                    <Ready ok={status.asr_ready} okText="Ready" badText="Not installed (uv sync --extra asr)" />
+                  </dd>
+                </div>
+              </dl>
+            </section>
+          </div>
+
+          <section className="card" style={{ marginTop: 24 }}>
+            <h2 className="card-title">Supported providers</h2>
+            <div className="table-container">
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th scope="col">Provider</th>
+                    <th scope="col">Default model</th>
+                    <th scope="col">Answers</th>
+                    <th scope="col">Embeddings</th>
+                    <th scope="col">Credentials</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {status.capabilities.map((c) => (
+                    <tr key={c.name}>
+                      <td>{c.display_name}</td>
+                      <td><code>{c.default_model}</code></td>
+                      <td>{c.supports_reasoning ? "Yes" : "—"}</td>
+                      <td>{c.supports_embeddings ? "Yes" : "—"}</td>
+                      <td>{c.is_configured ? "Available" : "Not configured"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </>
+      )}
     </div>
   )
 }
-
 export default ProvidersSettings

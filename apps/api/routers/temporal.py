@@ -10,6 +10,7 @@ from packages.reasoning.temporal import (
     CommitmentHistoryItem,
     DecisionHistoryItem,
     IssueHistoryItem,
+    MeetingNotFoundError,
     TemporalIntelligenceEngine,
     TemporalReconciliationResult,
     TimelineEventItem,
@@ -51,10 +52,16 @@ async def reconcile_meeting_lifecycle(
     request: ReconcileRequest,
     user: UserIdentity = Depends(require_member),
 ) -> TemporalReconciliationResult:
-    """Analyze a meeting's facts against prior organisational history to detect cross-meeting changes."""
+    """Analyze a meeting's facts against earlier meetings of the same organisation."""
     async with get_db_session(settings.database_url) as session:
         engine = TemporalIntelligenceEngine(session, org_id=user.org_id)
-        return await engine.reconcile_meeting_lifecycle(request.meeting_id)
+        try:
+            return await engine.reconcile_meeting_lifecycle(request.meeting_id)
+        except MeetingNotFoundError:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Meeting '{request.meeting_id}' not found",
+            )
 
 
 @router.get("/decisions/{decision_id}/history", response_model=DecisionHistoryItem)

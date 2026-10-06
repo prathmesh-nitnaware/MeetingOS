@@ -1,4 +1,5 @@
 import pytest
+from apps.api.config import settings
 from httpx import AsyncClient
 
 
@@ -18,11 +19,13 @@ async def test_health_endpoint(async_client: AsyncClient):
     data = response.json()
     assert "status" in data
     assert data["app_name"] == "MeetingOS API"
-    assert data["version"] == "0.1.0"
+    assert data["version"] == settings.app_version
     assert "dependencies" in data
     assert "database" in data["dependencies"]
     assert "redis" in data["dependencies"]
-    assert "python_version" in data
+    # The public health probe must not leak internals or tenant data
+    assert "python_version" not in data
+    assert "details" not in data
 
 
 @pytest.mark.asyncio

@@ -14,6 +14,7 @@ async def test_traces_and_metrics_endpoints(async_client: AsyncClient):
         AgentExecutionTrace(
             trace_id=trace_id,
             query_id="qry-api-phase12-test",
+            org_id="org_dev",
             query="Which database was selected?",
             answer="PostgreSQL with pgvector",
             confidence=0.95,
@@ -27,6 +28,17 @@ async def test_traces_and_metrics_endpoints(async_client: AsyncClient):
     data = res.json()
     assert isinstance(data, list)
     assert any(t["trace_id"] == trace_id for t in data)
+
+    # 2b. Traces are private to the organisation that ran the query
+    res_beta = await async_client.get(
+        "/api/v1/query/traces", headers={"Authorization": "Bearer admin-beta-token"}
+    )
+    assert res_beta.status_code == 200
+    assert not any(t["trace_id"] == trace_id for t in res_beta.json())
+    res_beta_single = await async_client.get(
+        f"/api/v1/query/traces/{trace_id}", headers={"Authorization": "Bearer admin-beta-token"}
+    )
+    assert res_beta_single.status_code == 404
 
     # 3. Test get trace by ID
     res_single = await async_client.get(f"/api/v1/query/traces/{trace_id}", headers=HEADERS_VIEWER)

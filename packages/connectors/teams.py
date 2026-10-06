@@ -8,7 +8,7 @@ from packages.common.models import (
     SpeakerInfo,
     TranscriptSegment,
 )
-from packages.connectors.base import BaseMeetingConnector
+from packages.connectors.base import BaseMeetingConnector, is_placeholder
 from packages.connectors.models import (
     ConnectorConfig,
     ConnectorMeeting,
@@ -20,11 +20,15 @@ from packages.connectors.models import (
 class TeamsMeetingConnector(BaseMeetingConnector):
     """Microsoft Teams meeting connector parsing MS Graph API responses to CMF."""
 
+    display_name = "Microsoft Teams"
+
     def get_provider_name(self) -> str:
         return "teams"
 
     def validate_config(self, config: ConnectorConfig) -> bool:
-        return bool(config.tenant_id and config.client_id and config.client_secret)
+        return not any(
+            is_placeholder(getattr(config, f)) for f in ("tenant_id", "client_id", "client_secret")
+        )
 
     async def authenticate(self, config: ConnectorConfig) -> bool:
         if not self.validate_config(config):
@@ -37,18 +41,14 @@ class TeamsMeetingConnector(BaseMeetingConnector):
         # Here we verify if they are set to dummy/example credentials.
         if config.client_secret == "invalid-secret":
             raise ValueError("Authentication failed: Invalid Microsoft Graph client secret.")
-        return True
+        if self.is_demo(config):
+            return True
+        raise self.not_implemented()
 
     async def list_meetings(self, config: ConnectorConfig) -> list[ConnectorMeeting]:
-        if not await self.authenticate(config):
-            return []
-
-        # Real API Integration Point:
-        # GET https://graph.microsoft.com/v1.0/me/onlineMeetings or /communications/onlineMeetings
-        # In this mock-fallback skeleton we check if we should return deterministic mock meetings.
-        if config.client_secret == "mock-secret":
-            return self.get_mock_meetings()
-        return []
+        # Raises for non-demo credentials: the live API call is not implemented yet.
+        await self.authenticate(config)
+        return self.get_mock_meetings()
 
     def normalize_to_cmf(self, ext_meeting: ConnectorMeeting) -> Meeting:
         participants = [

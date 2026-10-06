@@ -307,12 +307,16 @@ async def test_api_security_boundary(async_client: AsyncClient):
     res_sync = await async_client.post("/api/v1/connectors/teams/sync", headers=headers_viewer)
     assert res_sync.status_code == 403
 
-    # 4. Admin token can view and has privilege to call sync (will return 400 because config is unconfigured)
+    # 4. Admin token can call sync, which is refused because the connector is disabled
     headers_admin = {"Authorization": "Bearer admin-secret-token"}
     res_sync_admin = await async_client.post("/api/v1/connectors/teams/sync", headers=headers_admin)
-    # Returns 400 Bad Request because credentials aren't set in config (unconfigured)
     assert res_sync_admin.status_code == 400
-    assert "Sync aborted: Configuration is invalid" in res_sync_admin.json()["detail"]
+    assert "Sync aborted" in res_sync_admin.json()["detail"]
+    assert "disabled" in res_sync_admin.json()["detail"]
+
+    # 5. Placeholder credentials copied from .env.example do not count as configured
+    for c in connectors_list:
+        assert c["authenticated"] is False
 
 
 # ==============================================================================
@@ -382,7 +386,7 @@ async def test_retention_purge(test_db_session: AsyncSession):
     test_db_session.add_all([old_meet, new_meet])
     await test_db_session.commit()
 
-    retention_svc = RetentionService(test_db_session)
+    retention_svc = RetentionService(test_db_session, org_id="org_dev")
 
     # Dry-run check (meetings older than 30 days)
     dry_results = await retention_svc.run_cleanup(meeting_days=30, dry_run=True)

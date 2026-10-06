@@ -1,4 +1,9 @@
-from packages.connectors.base import BaseMeetingConnector
+from packages.connectors.base import (
+    DEMO_CLIENT_SECRET,
+    BaseMeetingConnector,
+    ConnectorNotImplementedError,
+    is_placeholder,
+)
 from packages.connectors.google_meet import GoogleMeetMeetingConnector
 from packages.connectors.models import (
     ConnectorConfig,
@@ -22,6 +27,9 @@ connector_registry.register(GoogleMeetMeetingConnector())
 
 __all__ = [
     "BaseMeetingConnector",
+    "ConnectorNotImplementedError",
+    "DEMO_CLIENT_SECRET",
+    "is_placeholder",
     "ConnectorMeeting",
     "ConnectorTranscriptSegment",
     "ConnectorParticipant",

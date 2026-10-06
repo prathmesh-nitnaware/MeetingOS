@@ -13,6 +13,11 @@ class RuleBasedClassifier(BaseClassifier):
             re.IGNORECASE,
         ),
         re.compile(r"\b(choice is|official choice|consensus is|selected)\b", re.IGNORECASE),
+        # Spoken phrasings common in real (transcribed) meetings
+        re.compile(
+            r"\b(decision (?:taken|made)|final decision|(?:we are|we're|we will|we'll|let's|let us) go(?:ing)? with)\b",
+            re.IGNORECASE,
+        ),
     ]
 
     ACTION_PATTERNS = [

@@ -18,7 +18,7 @@ class GeminiReasoner(BaseReasoner):
 
     def __init__(
         self,
-        model_name: str = "gemini-1.5-flash",
+        model_name: str = "gemini-2.5-flash",
         base_url: str = "https://generativelanguage.googleapis.com",
         api_key: str | None = None,
         max_retries: int = 3,
@@ -99,16 +99,18 @@ class GeminiReasoner(BaseReasoner):
         user_content = self._build_contents(question, evidence, context)
         t0 = time.perf_counter()
 
-        endpoint_url = (
-            f"{self.base_url}/v1beta/models/{self.model_name}:generateContent?key={self.api_key}"
-        )
+        # API key goes in a header (never the URL, which ends up in HTTP client logs)
+        endpoint_url = f"{self.base_url}/v1beta/models/{self.model_name}:generateContent"
 
         for attempt in range(self.max_retries):
             try:
                 async with httpx.AsyncClient(timeout=self.timeout_seconds) as client:
                     response = await client.post(
                         endpoint_url,
-                        headers={"Content-Type": "application/json"},
+                        headers={
+                            "Content-Type": "application/json",
+                            "x-goog-api-key": self.api_key,
+                        },
                         json={
                             "system_instruction": {"parts": [{"text": system_instruction}]},
                             "contents": [{"parts": [{"text": user_content}]}],
@@ -208,7 +210,7 @@ class GeminiEmbedder(BaseEmbedder):
     def __init__(
         self,
         dimension: int = 768,
-        model_name: str = "text-embedding-004",
+        model_name: str = "gemini-embedding-001",
         base_url: str = "https://generativelanguage.googleapis.com",
         api_key: str | None = None,
         timeout_seconds: float = 30.0,
@@ -260,20 +262,22 @@ class GeminiEmbedder(BaseEmbedder):
         if not missing_texts:
             return [r for r in results if r is not None]
 
-        endpoint_url = (
-            f"{self.base_url}/v1beta/models/{self.model_name}:batchEmbedContents?key={self.api_key}"
-        )
+        endpoint_url = f"{self.base_url}/v1beta/models/{self.model_name}:batchEmbedContents"
 
         try:
             requests_payload = [
-                {"model": f"models/{self.model_name}", "content": {"parts": [{"text": t}]}}
+                {
+                    "model": f"models/{self.model_name}",
+                    "content": {"parts": [{"text": t}]},
+                    "outputDimensionality": self.dimension,
+                }
                 for t in missing_texts
             ]
 
             async with httpx.AsyncClient(timeout=self.timeout_seconds) as client:
                 response = await client.post(
                     endpoint_url,
-                    headers={"Content-Type": "application/json"},
+                    headers={"Content-Type": "application/json", "x-goog-api-key": self.api_key},
                     json={"requests": requests_payload},
                 )
                 response.raise_for_status()

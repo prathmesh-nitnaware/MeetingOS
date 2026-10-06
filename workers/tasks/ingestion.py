@@ -4,15 +4,15 @@ from pathlib import Path
 from typing import Any
 
 from packages.common.enums import ProcessingStatus, SourceType
+from packages.common.models import TranscriptSegment
 from packages.ingestion.pipeline import IngestionPipeline
-from packages.memory.database import get_db_session
+from packages.memory.database import dispose_engine, get_db_session
 from packages.memory.repository import MeetingRepository
 from packages.nlp.interfaces import BaseEmbedder
-from packages.nlp.mock import MockEmbedder
 from packages.nlp.pipeline import NLPExtractionPipeline
 from packages.reasoning.temporal import TemporalIntelligenceEngine
 from packages.speech.interfaces import BaseASR, BaseDiarizer
-from packages.speech.mock import MockASR, MockDiarizer
+from packages.speech.whisper import SpeechProviderUnavailableError
 
 from workers.celery_app import celery_app
 
@@ -20,19 +20,51 @@ logger = logging.getLogger(__name__)
 
 
 def get_speech_providers(
-    asr_name: str = "mock", diarizer_name: str = "mock"
+    asr_name: str | None = None, diarizer_name: str | None = None
 ) -> tuple[BaseASR, BaseDiarizer]:
-    """Factory to instantiate ASR and Diarizer providers by name."""
-    _ = (asr_name, diarizer_name)
-    asr = MockASR()
-    diarizer = MockDiarizer()
-    return asr, diarizer
+    """ASR and diarizer for the given names, defaulting to ASR_PROVIDER / DIARIZER_PROVIDER."""
+    from apps.api.providers import build_speech_providers
+
+    return build_speech_providers(asr_name, diarizer_name)
 
 
-def get_embedder_provider(embedder_name: str = "mock") -> BaseEmbedder:
-    """Factory to instantiate Embedder provider by name."""
-    _ = embedder_name
-    return MockEmbedder()
+def get_embedder_provider(embedder_name: str | None = None) -> BaseEmbedder:
+    """Embedder for the given name, defaulting to MEETINGOS_EMBEDDING_PROVIDER."""
+    from apps.api.providers import build_embedder
+
+    if embedder_name:
+        from packages.providers.embeddings import get_embedder
+
+        return get_embedder(embedder_name)
+    return build_embedder()
+
+
+def normalize_segment_ids(
+    meeting_id: str, segments: list[TranscriptSegment]
+) -> list[TranscriptSegment]:
+    """Give every segment the meeting-prefixed ID it is stored under.
+
+    Facts, events and evidence reference segments by ID; extracting them from un-prefixed IDs
+    (``seg-003``) while the transcript is stored as ``<meeting>-seg-003`` left every "jump to
+    evidence" link and decision timestamp dangling.
+    """
+    normalized: list[TranscriptSegment] = []
+    for seg in segments:
+        seg_id = seg.segment_id
+        if not seg_id.startswith(f"{meeting_id}-"):
+            seg_id = f"{meeting_id}-{seg_id}"
+        normalized.append(seg.model_copy(update={"segment_id": seg_id}))
+    return normalized
+
+
+def _friendly_error(exc: Exception) -> str:
+    """Message stored on the job and shown to users. Only validation and speech-setup errors
+    are written for users; anything else (database, network, bugs) may contain internal
+    details, which stay in the server log."""
+    if not isinstance(exc, ValueError | SpeechProviderUnavailableError):
+        return "Processing failed because of an internal error. Details are in the server log."
+    message = str(exc) or type(exc).__name__
+    return message if len(message) <= 500 else message[:497] + "..."
 
 
 async def run_ingestion_pipeline(
@@ -42,11 +74,11 @@ async def run_ingestion_pipeline(
     source_type_str: str,
     database_url: str,
     org_id: str = "org_dev",
-    asr_provider_name: str = "mock",
-    diarizer_provider_name: str = "mock",
-    embedder_provider_name: str = "mock",
+    asr_provider_name: str | None = None,
+    diarizer_provider_name: str | None = None,
+    embedder_provider_name: str | None = None,
 ) -> dict[str, Any]:
-    """Execute end-to-end speech ingestion, NLP fact extraction, and vector embedding pipeline."""
+    """Speech transcription, NLP fact extraction, embeddings and temporal reconciliation."""
     file_path = Path(file_path_str)
     source_type = SourceType(source_type_str)
     asr, diarizer = get_speech_providers(asr_provider_name, diarizer_provider_name)
@@ -62,10 +94,11 @@ async def run_ingestion_pipeline(
         await repo.update_meeting_status(meeting_id=meeting_id, status=ProcessingStatus.RUNNING)
 
     try:
-        # 1. Speech Transcription & Diarization
-        segments, speakers, duration = await ingestion_pipe.process_file(
+        # 1. Speech Transcription & Diarization (or text/subtitle parsing)
+        raw_segments, speakers, duration = await ingestion_pipe.process_file(
             file_path, source_type=source_type
         )
+        segments = normalize_segment_ids(meeting_id, raw_segments)
 
         async with get_db_session(database_url) as session:
             repo = MeetingRepository(session)
@@ -79,21 +112,16 @@ async def run_ingestion_pipeline(
             await repo.update_meeting_status(
                 meeting_id, status=ProcessingStatus.RUNNING, duration_seconds=duration
             )
+            meeting_obj = await repo.get_meeting(meeting_id, org_id=org_id)
 
         # 2. NLP Extraction Pipeline
-        meeting_obj = None
-        async with get_db_session(database_url) as session:
-            repo = MeetingRepository(session)
-            meeting_obj = await repo.get_meeting(meeting_id)
-
-        ref_date = meeting_obj.meeting_date if meeting_obj else None
         nlp_results = await nlp_pipe.process_transcript(
             meeting_id=meeting_id,
             segments=segments,
-            meeting_date=ref_date,
+            meeting_date=meeting_obj.meeting_date if meeting_obj else None,
         )
 
-        # 3. Dense Vector Embeddings Generation
+        # 3. Dense Vector Embeddings
         async with get_db_session(database_url) as session:
             repo = MeetingRepository(session)
             await repo.update_job(
@@ -105,11 +133,12 @@ async def run_ingestion_pipeline(
 
         segment_texts = [s.text for s in segments]
         vectors = await embedder.embed(segment_texts) if segment_texts else []
-        embedding_records: list[tuple[str, str, str, list[float]]] = []
-        for seg, vec in zip(segments, vectors, strict=False):
-            embedding_records.append(("segment", seg.segment_id, seg.text, vec))
+        embedding_records: list[tuple[str, str, str, list[float]]] = [
+            ("segment", seg.segment_id, seg.text, vec)
+            for seg, vec in zip(segments, vectors, strict=False)
+        ]
 
-        # 4. Persist NLP Facts, Embeddings, and Evidence Records
+        # 4. Persist NLP facts, embeddings and evidence; 5. reconcile with earlier meetings
         async with get_db_session(database_url) as session:
             repo = MeetingRepository(session)
             await repo.update_job(
@@ -122,7 +151,6 @@ async def run_ingestion_pipeline(
             await repo.save_embeddings(meeting_id, embedding_records)
             await repo.save_evidence_records(meeting_id, nlp_results.evidence)
 
-            # 5. Temporal Intelligence Reconciliation across meetings
             await repo.update_job(
                 job_id=job_id,
                 status=ProcessingStatus.RUNNING,
@@ -164,7 +192,7 @@ async def run_ingestion_pipeline(
                 status=ProcessingStatus.FAILED,
                 stage="failed",
                 progress=1.0,
-                error_message=str(exc),
+                error_message=_friendly_error(exc),
             )
             await repo.update_meeting_status(meeting_id, status=ProcessingStatus.FAILED)
         raise
@@ -177,24 +205,31 @@ def process_meeting_task(
     job_id: str,
     file_path_str: str,
     source_type_str: str,
-    database_url: str,
-    org_id: str = "org_dev",
-    asr_provider_name: str = "mock",
-    diarizer_provider_name: str = "mock",
-    embedder_provider_name: str = "mock",
+    org_id: str,
+    asr_provider_name: str | None = None,
+    diarizer_provider_name: str | None = None,
+    embedder_provider_name: str | None = None,
 ) -> dict[str, Any]:
-    """Celery task entry point running the async ingestion pipeline in an event loop."""
+    """Celery entry point. The worker uses its own DATABASE_URL setting; credentials are never
+    put into task arguments (they would sit in plain text in the Redis broker)."""
+    from apps.api.config import settings
+
     _ = self
-    return asyncio.run(
-        run_ingestion_pipeline(
-            meeting_id=meeting_id,
-            job_id=job_id,
-            file_path_str=file_path_str,
-            source_type_str=source_type_str,
-            database_url=database_url,
-            org_id=org_id,
-            asr_provider_name=asr_provider_name,
-            diarizer_provider_name=diarizer_provider_name,
-            embedder_provider_name=embedder_provider_name,
-        )
-    )
+
+    async def run() -> dict[str, Any]:
+        try:
+            return await run_ingestion_pipeline(
+                meeting_id=meeting_id,
+                job_id=job_id,
+                file_path_str=file_path_str,
+                source_type_str=source_type_str,
+                database_url=settings.database_url,
+                org_id=org_id,
+                asr_provider_name=asr_provider_name,
+                diarizer_provider_name=diarizer_provider_name,
+                embedder_provider_name=embedder_provider_name,
+            )
+        finally:
+            await dispose_engine()
+
+    return asyncio.run(run())

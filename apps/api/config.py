@@ -35,6 +35,28 @@ VALID_REASONER_PROVIDERS = {
     "google",
 }
 
+VALID_ASR_PROVIDERS = {"mock", "whisper", "faster_whisper", "local"}
+VALID_DIARIZER_PROVIDERS = {"none", "single", "mock"}
+
+# Values copied from .env.example that must never be accepted as real secrets
+PLACEHOLDER_SECRET_MARKERS = (
+    "insecure",
+    "change-this",
+    "change-in-production",
+    "replace-for-prod",
+    "your-",
+    "placeholder",
+    "example",
+)
+
+
+def is_placeholder(value: str | None) -> bool:
+    """True when a credential is missing or still holds a template value from .env.example."""
+    if not value or not value.strip():
+        return True
+    lowered = value.strip().lower()
+    return lowered.startswith("your-") or lowered.endswith("-here") or "placeholder" in lowered
+
 
 class Settings(BaseSettings):
     """Application configuration loaded from environment or .env file."""
@@ -55,7 +77,16 @@ class Settings(BaseSettings):
     secret_key: str = Field(
         default="dev-insecure-secret-key-change-in-production", alias="MEETINGOS_SECRET_KEY"
     )
-    allowed_origins: str | list[str] = Field(default=["*"], alias="MEETINGOS_ALLOWED_ORIGINS")
+    access_token_ttl_minutes: int = Field(
+        default=24 * 60, ge=5, alias="MEETINGOS_ACCESS_TOKEN_TTL_MINUTES"
+    )
+    # Hard-coded development tokens (admin-secret-token, ...) are only ever accepted when
+    # this flag is on AND app_env is development/test. They are always off in production.
+    enable_dev_auth: bool = Field(default=True, alias="MEETINGOS_ENABLE_DEV_AUTH")
+    allowed_origins: str | list[str] = Field(
+        default=["http://localhost:5173", "http://127.0.0.1:5173"],
+        alias="MEETINGOS_ALLOWED_ORIGINS",
+    )
 
     @field_validator("allowed_origins", mode="after")
     @classmethod
@@ -86,27 +117,44 @@ class Settings(BaseSettings):
             url = "postgresql+asyncpg://" + url[len("postgresql://") :]
         return url
 
-    # Redis
+    # Redis & Celery
     redis_url: str = Field(default="redis://localhost:6379/0")
+    celery_broker_url: str | None = Field(default=None, alias="CELERY_BROKER_URL")
+    celery_result_backend: str | None = Field(default=None, alias="CELERY_RESULT_BACKEND")
+    # When false, background work runs inside the API process instead of on Celery workers
+    use_celery: bool = Field(default=True, alias="MEETINGOS_USE_CELERY")
 
     # Storage & Uploads
     upload_storage_dir: str = Field(default="./data/uploads")
     max_upload_size_mb: int = Field(default=500, gt=0)
 
     # Rate Limiting (Requests per minute)
+    rate_limiting_enabled: bool = Field(default=True, alias="MEETINGOS_RATE_LIMITING_ENABLED")
     rate_limit_query_per_min: int = Field(default=60, ge=1, alias="MEETINGOS_RATE_LIMIT_QUERY")
     rate_limit_upload_per_min: int = Field(default=10, ge=1, alias="MEETINGOS_RATE_LIMIT_UPLOAD")
     rate_limit_agentic_per_min: int = Field(default=20, ge=1, alias="MEETINGOS_RATE_LIMIT_AGENTIC")
     rate_limit_admin_per_min: int = Field(default=30, ge=1, alias="MEETINGOS_RATE_LIMIT_ADMIN")
+    rate_limit_login_per_min: int = Field(default=10, ge=1, alias="MEETINGOS_RATE_LIMIT_LOGIN")
 
     # Speech / ML Providers
-    asr_provider: str = "mock"
-    diarizer_provider: str = "mock"
-    ner_provider: str = "mock"
-    classifier_provider: str = "mock"
+    # ASR: "whisper" = real speech-to-text via faster-whisper (install the `asr` extra),
+    #      "mock" = canned demo transcript (tests / demos only).
+    asr_provider: str = "whisper"
+    # Diarizer: "none" = everything attributed to one speaker, "mock" = canned demo speakers.
+    diarizer_provider: str = "none"
+    whisper_model: str = Field(default="base", alias="MEETINGOS_WHISPER_MODEL")
+    whisper_compute_type: str = Field(default="int8", alias="MEETINGOS_WHISPER_COMPUTE_TYPE")
+    whisper_language: str | None = Field(default=None, alias="MEETINGOS_WHISPER_LANGUAGE")
+    ner_provider: str = "rule_based"
+    classifier_provider: str = "rule_based"
+
+    # Background processing
+    retention_interval_hours: int = Field(
+        default=24, ge=1, alias="MEETINGOS_RETENTION_INTERVAL_HOURS"
+    )
 
     # Generic Embedding & Reasoner Selection
-    embedding_provider: str = Field(default="mock", alias="MEETINGOS_EMBEDDING_PROVIDER")
+    embedding_provider: str = Field(default="local", alias="MEETINGOS_EMBEDDING_PROVIDER")
     embedding_model: str = Field(default="local-semantic-v1", alias="MEETINGOS_EMBEDDING_MODEL")
     embedding_base_url: str | None = Field(default=None, alias="MEETINGOS_EMBEDDING_BASE_URL")
     embedding_api_key: str | None = Field(
@@ -116,7 +164,7 @@ class Settings(BaseSettings):
         ),
     )
 
-    reasoner_provider: str = Field(default="mock", alias="MEETINGOS_REASONER_PROVIDER")
+    reasoner_provider: str = Field(default="local", alias="MEETINGOS_REASONER_PROVIDER")
     reasoner_model: str = Field(default="local-reasoner-v1", alias="MEETINGOS_REASONER_MODEL")
     reasoner_base_url: str | None = Field(default=None, alias="MEETINGOS_REASONER_BASE_URL")
     reasoner_api_key: str | None = Field(
@@ -129,16 +177,17 @@ class Settings(BaseSettings):
     # Provider-Specific Configs
     # Anthropic
     anthropic_api_key: str | None = Field(default=None, alias="MEETINGOS_ANTHROPIC_API_KEY")
-    anthropic_model: str = Field(
-        default="claude-3-5-sonnet-20241022", alias="MEETINGOS_ANTHROPIC_MODEL"
-    )
+    anthropic_model: str = Field(default="claude-opus-5-5", alias="MEETINGOS_ANTHROPIC_MODEL")
     anthropic_base_url: str = Field(
         default="https://api.anthropic.com/v1", alias="MEETINGOS_ANTHROPIC_BASE_URL"
     )
 
     # Google Gemini
     gemini_api_key: str | None = Field(default=None, alias="MEETINGOS_GEMINI_API_KEY")
-    gemini_model: str = Field(default="gemini-1.5-flash", alias="MEETINGOS_GEMINI_MODEL")
+    gemini_model: str = Field(default="gemini-2.5-flash", alias="MEETINGOS_GEMINI_MODEL")
+    gemini_embedding_model: str = Field(
+        default="gemini-embedding-001", alias="MEETINGOS_GEMINI_EMBEDDING_MODEL"
+    )
     gemini_base_url: str = Field(
         default="https://generativelanguage.googleapis.com", alias="MEETINGOS_GEMINI_BASE_URL"
     )
@@ -181,6 +230,16 @@ class Settings(BaseSettings):
                 f"Allowed: {sorted(VALID_REASONER_PROVIDERS)}"
             )
 
+        if self.asr_provider.lower() not in VALID_ASR_PROVIDERS:
+            raise ValueError(
+                f"Invalid ASR_PROVIDER: '{self.asr_provider}'. Allowed: {sorted(VALID_ASR_PROVIDERS)}"
+            )
+        if self.diarizer_provider.lower() not in VALID_DIARIZER_PROVIDERS:
+            raise ValueError(
+                f"Invalid DIARIZER_PROVIDER: '{self.diarizer_provider}'. "
+                f"Allowed: {sorted(VALID_DIARIZER_PROVIDERS)}"
+            )
+
         # Validate database url scheme
         if not self.database_url.startswith(
             "postgresql+asyncpg://"
@@ -201,11 +260,13 @@ class Settings(BaseSettings):
                 )
             if (
                 not self.secret_key
-                or len(self.secret_key) < 16
-                or any(w in self.secret_key.lower() for w in ("insecure", "dev", "test", "default"))
+                or len(self.secret_key) < 32
+                or any(w in self.secret_key.lower() for w in ("dev", "test", "default"))
+                or any(m in self.secret_key.lower() for m in PLACEHOLDER_SECRET_MARKERS)
             ):
                 raise ValueError(
-                    "Production configuration error: MEETINGOS_SECRET_KEY must be a secure, non-default string of at least 16 characters."
+                    "Production configuration error: MEETINGOS_SECRET_KEY must be a secure, non-default string of at least 32 characters "
+                    '(generate one with: python -c "import secrets; print(secrets.token_urlsafe(48))").'
                 )
             if "*" in self.allowed_origins:
                 raise ValueError(
@@ -215,44 +276,85 @@ class Settings(BaseSettings):
                 raise ValueError(
                     "Production configuration error: max_upload_size_mb exceeds maximum production limit (2000 MB)."
                 )
-            if emb in ("openai", "openai_compatible") and not self.embedding_api_key:
+            if emb in ("openai", "openai_compatible") and not self.openai_embedding_key:
                 raise ValueError(
                     "Production configuration error: OpenAI embedding provider configured without MEETINGOS_EMBEDDING_API_KEY."
                 )
-            if emb in ("gemini", "google") and not (self.gemini_api_key or self.embedding_api_key):
+            if emb in ("gemini", "google") and not self.gemini_embedding_key:
                 raise ValueError(
                     "Production configuration error: Gemini embedding provider configured without MEETINGOS_GEMINI_API_KEY."
                 )
-            if reas in ("openai", "openai_compatible", "llm") and not self.reasoner_api_key:
+            if reas in ("openai", "openai_compatible", "llm") and not self.openai_reasoner_key:
                 raise ValueError(
                     "Production configuration error: OpenAI reasoner provider configured without MEETINGOS_REASONER_API_KEY."
                 )
-            if reas in ("anthropic", "claude") and not (
-                self.anthropic_api_key or self.reasoner_api_key
-            ):
+            if reas in ("anthropic", "claude") and not self.anthropic_key:
                 raise ValueError(
                     "Production configuration error: Anthropic reasoner configured without MEETINGOS_ANTHROPIC_API_KEY."
                 )
-            if reas in ("gemini", "google") and not (self.gemini_api_key or self.reasoner_api_key):
+            if reas in ("gemini", "google") and not self.gemini_reasoner_key:
                 raise ValueError(
                     "Production configuration error: Gemini reasoner configured without MEETINGOS_GEMINI_API_KEY."
                 )
-            if self.teams_enabled and (not self.teams_client_id or not self.teams_client_secret):
+            if self.teams_enabled and (
+                is_placeholder(self.teams_client_id) or is_placeholder(self.teams_client_secret)
+            ):
                 raise ValueError(
                     "Production configuration error: Teams connector enabled without credentials."
                 )
-            if self.zoom_enabled and (not self.zoom_client_id or not self.zoom_client_secret):
+            if self.zoom_enabled and (
+                is_placeholder(self.zoom_client_id) or is_placeholder(self.zoom_client_secret)
+            ):
                 raise ValueError(
                     "Production configuration error: Zoom connector enabled without credentials."
                 )
             if self.google_meet_enabled and (
-                not self.google_client_id or not self.google_client_secret
+                is_placeholder(self.google_client_id) or is_placeholder(self.google_client_secret)
             ):
                 raise ValueError(
                     "Production configuration error: Google Meet connector enabled without credentials."
                 )
 
         return self
+
+    # ------------------------------------------------------------------ derived helpers
+
+    @property
+    def dev_auth_enabled(self) -> bool:
+        """Development tokens are never honoured outside development/test environments."""
+        return self.enable_dev_auth and self.app_env in ("development", "test")
+
+    @property
+    def broker_url(self) -> str:
+        return self.celery_broker_url or self.redis_url
+
+    @property
+    def result_backend_url(self) -> str:
+        return self.celery_result_backend or self.redis_url
+
+    @staticmethod
+    def _real(value: str | None) -> str | None:
+        return None if is_placeholder(value) else value
+
+    @property
+    def openai_embedding_key(self) -> str | None:
+        return self._real(self.embedding_api_key)
+
+    @property
+    def openai_reasoner_key(self) -> str | None:
+        return self._real(self.reasoner_api_key)
+
+    @property
+    def anthropic_key(self) -> str | None:
+        return self._real(self.anthropic_api_key) or self._real(self.reasoner_api_key)
+
+    @property
+    def gemini_reasoner_key(self) -> str | None:
+        return self._real(self.gemini_api_key) or self._real(self.reasoner_api_key)
+
+    @property
+    def gemini_embedding_key(self) -> str | None:
+        return self._real(self.gemini_api_key) or self._real(self.embedding_api_key)
 
 
 settings = Settings()

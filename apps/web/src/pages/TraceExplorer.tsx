@@ -1,254 +1,168 @@
-import React, { useEffect, useState } from "react"
-import { GitBranch, Clock, AlertTriangle, ShieldCheck, CheckCircle2, XCircle, Search } from "lucide-react"
+import React, { useCallback, useEffect, useState } from "react"
+import { AlertTriangle, CheckCircle2, Clock, GitBranch, MinusCircle, XCircle } from "lucide-react"
+import { Notice } from "../components/Notice"
+import { Spinner } from "../components/Spinner"
+import { api, type ExecutionTrace } from "../services/api"
+import { formatDateTime, humanize } from "../utils/format"
 
-interface AgentTraceStep {
-  agent: string
-  status: string
-  duration_seconds?: number
-  latency_ms?: number
-  evidence_count?: number
-  events_count?: number
-  relations_count?: number
-  model_name?: string
-  output_summary?: string
-  error?: string
-}
-
-interface ExecutionTrace {
-  trace_id: string
-  query_id: string
-  query: string
-  answer: string
-  confidence: number
-  insufficient_evidence: boolean
-  total_latency_ms: number
-  steps: AgentTraceStep[]
-  citations: string[]
-  conflicts: Array<{
-    conflict_type: string
-    earlier_meeting_id: string
-    later_meeting_id: string
-    earlier_claim: string
-    latest_claim: string
-  }>
-  created_at: string
+const StepIcon: React.FC<{ status: string }> = ({ status }) => {
+  if (status === "completed") return <CheckCircle2 size={16} className="text-success" aria-label="completed" />
+  if (status === "skipped") return <MinusCircle size={16} className="muted" aria-label="skipped" />
+  return <XCircle size={16} className="text-danger" aria-label={status} />
 }
 
 export const TraceExplorer: React.FC = () => {
   const [traces, setTraces] = useState<ExecutionTrace[]>([])
-  const [selectedTrace, setSelectedTrace] = useState<ExecutionTrace | null>(null)
-  const [searchFilter, setSearchFilter] = useState("")
+  const [selected, setSelected] = useState<ExecutionTrace | null>(null)
+  const [filter, setFilter] = useState("")
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    fetchTraces()
-  }, [])
-
-  const fetchTraces = async () => {
+  const load = useCallback(async () => {
+    setLoading(true)
+    setError(null)
     try {
-      setLoading(true)
-      const res = await fetch("/api/v1/query/traces?limit=30", {
-        headers: { Authorization: "Bearer viewer-secret-token" },
-      })
-      if (res.ok) {
-        const data = await res.json()
-        setTraces(data)
-        if (data.length > 0) {
-          setSelectedTrace(data[0])
-        }
-      }
+      const data = await api.getTraces(50)
+      setTraces(data)
+      setSelected((prev) => data.find((t) => t.trace_id === prev?.trace_id) ?? data[0] ?? null)
     } catch (err) {
-      console.error("Failed to fetch traces", err)
+      setError(err instanceof Error ? err.message : "Failed to load traces.")
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
 
-  const filteredTraces = traces.filter(
-    (t) =>
-      t.query.toLowerCase().includes(searchFilter.toLowerCase()) ||
-      t.trace_id.toLowerCase().includes(searchFilter.toLowerCase())
+  useEffect(() => {
+    void load()
+  }, [load])
+
+  const visible = traces.filter(
+    (t) => t.query.toLowerCase().includes(filter.toLowerCase()) || t.trace_id.toLowerCase().includes(filter.toLowerCase())
   )
 
   return (
-    <div className="p-8 max-w-7xl mx-auto space-y-6">
-      <div className="flex justify-between items-center">
+    <div>
+      <header className="page-header">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-white flex items-center gap-3">
-            <GitBranch className="text-indigo-400" />
-            Agent Trace Explorer
+          <h1 className="page-title with-icon">
+            <GitBranch aria-hidden="true" /> Agent Trace Explorer
           </h1>
-          <p className="text-slate-400 mt-1">
-            Real-time execution traces, specialist routing breakdowns, and chronological conflict reconciliations.
-          </p>
+          <p className="page-subtitle">Step-by-step record of every agentic question asked in your organization.</p>
         </div>
-        <button
-          onClick={fetchTraces}
-          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-white font-medium transition text-sm"
-        >
-          Refresh Traces
+        <button type="button" className="btn btn-outline" onClick={() => void load()} disabled={loading}>
+          {loading ? "Refreshing…" : "Refresh"}
         </button>
-      </div>
+      </header>
 
-      <div className="grid grid-cols-12 gap-6">
-        {/* Left List */}
-        <div className="col-span-5 bg-slate-900/60 border border-slate-800 rounded-xl p-4 flex flex-col h-[700px]">
-          <div className="relative mb-3">
-            <Search className="absolute left-3 top-2.5 text-slate-500" size={16} />
-            <input
-              type="text"
-              placeholder="Filter by query or trace ID..."
-              value={searchFilter}
-              onChange={(e) => setSearchFilter(e.target.value)}
-              className="w-full pl-9 pr-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-200 focus:outline-none focus:border-indigo-500"
-            />
-          </div>
+      {error && <Notice tone="error">{error}</Notice>}
 
-          <div className="overflow-y-auto flex-1 space-y-2 pr-1">
-            {loading ? (
-              <p className="text-slate-500 text-sm p-4 text-center">Loading traces...</p>
-            ) : filteredTraces.length === 0 ? (
-              <p className="text-slate-500 text-sm p-4 text-center">No execution traces found.</p>
-            ) : (
-              filteredTraces.map((trace) => (
-                <div
-                  key={trace.trace_id}
-                  onClick={() => setSelectedTrace(trace)}
-                  className={`p-3.5 rounded-lg border cursor-pointer transition ${
-                    selectedTrace?.trace_id === trace.trace_id
-                      ? "bg-indigo-950/40 border-indigo-500/50"
-                      : "bg-slate-800/40 border-slate-800 hover:border-slate-700"
-                  }`}
-                >
-                  <div className="flex justify-between items-start gap-2 mb-1">
-                    <span className="text-xs font-mono text-indigo-400 truncate">{trace.trace_id}</span>
-                    <span className="text-xs text-slate-500 flex items-center gap-1 shrink-0">
-                      <Clock size={12} />
-                      {trace.total_latency_ms.toFixed(1)}ms
+      <div className="split-layout">
+        <section className="card split-list" aria-label="Traces">
+          <label htmlFor="trace-filter" className="sr-only">Filter traces</label>
+          <input
+            id="trace-filter"
+            className="form-input"
+            placeholder="Filter by question or trace ID..."
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+          />
+          {loading && traces.length === 0 ? (
+            <Spinner message="Loading traces..." />
+          ) : visible.length === 0 ? (
+            <p className="muted" style={{ marginTop: 16 }}>
+              No traces yet. Ask a question in Search &amp; QA → Agentic reasoning.
+            </p>
+          ) : (
+            <ul className="selectable-list">
+              {visible.map((t) => (
+                <li key={t.trace_id}>
+                  <button
+                    type="button"
+                    className={`selectable-item${selected?.trace_id === t.trace_id ? " selected" : ""}`}
+                    onClick={() => setSelected(t)}
+                    aria-pressed={selected?.trace_id === t.trace_id}
+                  >
+                    <span className="selectable-meta">
+                      <code>{t.trace_id}</code>
+                      <span><Clock size={12} aria-hidden="true" /> {Math.round(t.total_latency_ms)} ms</span>
                     </span>
-                  </div>
-                  <p className="text-sm font-medium text-slate-200 line-clamp-2">{trace.query}</p>
-                  <div className="mt-2 flex items-center gap-2">
-                    <span
-                      className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                        trace.insufficient_evidence
-                          ? "bg-amber-950/50 text-amber-400 border border-amber-800/40"
-                          : "bg-emerald-950/50 text-emerald-400 border border-emerald-800/40"
-                      }`}
-                    >
-                      {trace.insufficient_evidence ? "Refused (Insufficient)" : `Confidence ${(trace.confidence * 100).toFixed(0)}%`}
-                    </span>
-                    {trace.conflicts.length > 0 && (
-                      <span className="text-xs px-2 py-0.5 rounded-full bg-rose-950/50 text-rose-400 border border-rose-800/40 flex items-center gap-1">
-                        <AlertTriangle size={10} />
-                        Reversal Handled
+                    <span className="selectable-title">{t.query}</span>
+                    <span className="selectable-meta">
+                      <span className={`badge ${t.insufficient_evidence ? "badge-running" : "badge-succeeded"}`}>
+                        {t.insufficient_evidence ? "Not enough evidence" : `Confidence ${Math.round(t.confidence * 100)}%`}
                       </span>
-                    )}
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
+                      {t.conflicts.length > 0 && (
+                        <span className="badge badge-failed">
+                          <AlertTriangle size={10} aria-hidden="true" /> Changes detected
+                        </span>
+                      )}
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
 
-        {/* Right Detail Pane */}
-        <div className="col-span-7 bg-slate-900/60 border border-slate-800 rounded-xl p-6 h-[700px] overflow-y-auto space-y-6">
-          {selectedTrace ? (
-            <>
+        <section className="card split-detail" aria-label="Trace detail">
+          {!selected ? (
+            <p className="muted">Select a trace to see how it was answered.</p>
+          ) : (
+            <div className="stack">
               <div>
-                <div className="flex justify-between items-center">
-                  <span className="text-xs font-mono text-indigo-400">{selectedTrace.trace_id}</span>
-                  <span className="text-xs text-slate-400">{new Date(selectedTrace.created_at).toLocaleString()}</span>
-                </div>
-                <h2 className="text-xl font-bold text-white mt-1">{selectedTrace.query}</h2>
+                <p className="muted small">
+                  <code>{selected.trace_id}</code> · {formatDateTime(selected.created_at)}
+                </p>
+                <h2 className="card-title">{selected.query}</h2>
               </div>
-
-              <div className="bg-slate-800/60 border border-slate-700/60 rounded-lg p-4 space-y-2">
-                <div className="text-xs font-semibold uppercase tracking-wider text-slate-400">Synthesized Answer</div>
-                <p className="text-slate-200 text-sm leading-relaxed">{selectedTrace.answer}</p>
+              <div className="card inset">
+                <p className="kpi-label">Answer</p>
+                <p>{selected.answer}</p>
               </div>
-
-              {/* Conflict Reconciliations */}
-              {selectedTrace.conflicts.length > 0 && (
-                <div className="bg-rose-950/20 border border-rose-800/40 rounded-lg p-4 space-y-3">
-                  <div className="text-xs font-semibold uppercase tracking-wider text-rose-400 flex items-center gap-1.5">
-                    <AlertTriangle size={14} />
-                    Chronological Conflict Reconciled
-                  </div>
-                  {selectedTrace.conflicts.map((c, idx) => (
-                    <div key={idx} className="text-xs space-y-1 bg-slate-900/50 p-2.5 rounded border border-rose-900/30">
-                      <div className="text-slate-400 font-mono">Transition: {c.earlier_meeting_id} → {c.later_meeting_id}</div>
-                      <div className="text-slate-300">
-                        <span className="text-amber-400">Superseded:</span> {c.earlier_claim}
-                      </div>
-                      <div className="text-slate-200 font-medium">
-                        <span className="text-emerald-400">Authoritative:</span> {c.latest_claim}
-                      </div>
-                    </div>
+              {selected.conflicts.length > 0 && (
+                <div className="card inset">
+                  <p className="kpi-label">Changes detected across meetings</p>
+                  {selected.conflicts.map((c, i) => (
+                    <p key={i} className="small">
+                      <span className="text-warning">Earlier:</span> {c.earlier_claim}
+                      <br />
+                      <span className="text-success">Later:</span> {c.latest_claim}
+                    </p>
                   ))}
                 </div>
               )}
-
-              {/* Specialist Execution Pipeline */}
-              <div className="space-y-3">
-                <div className="text-xs font-semibold uppercase tracking-wider text-slate-400">Specialist Execution Chain</div>
-                <div className="space-y-2">
-                  {selectedTrace.steps.map((step, idx) => (
-                    <div
-                      key={idx}
-                      className="flex items-start gap-3 p-3 bg-slate-800/40 border border-slate-800 rounded-lg"
-                    >
-                      <div className="mt-0.5">
-                        {step.status === "completed" ? (
-                          <CheckCircle2 size={16} className="text-emerald-400" />
-                        ) : (
-                          <XCircle size={16} className="text-rose-400" />
-                        )}
+              <div>
+                <p className="kpi-label">Agent steps</p>
+                <ul className="step-list">
+                  {selected.steps.map((s, i) => (
+                    <li key={i} className="step-item">
+                      <StepIcon status={s.status} />
+                      <div>
+                        <strong>{humanize(s.agent)} agent</strong> <span className="muted">· {humanize(s.status)}</span>
+                        {s.latency_ms ? <span className="muted"> · {s.latency_ms.toFixed(1)} ms</span> : null}
+                        {s.output_summary && <div className="muted small">{s.output_summary}</div>}
+                        {s.model_name && <div className="muted small">Model: {s.model_name}</div>}
+                        {s.error && <div className="text-danger small">Error: {s.error}</div>}
                       </div>
-                      <div className="flex-1 text-xs space-y-1">
-                        <div className="flex justify-between">
-                          <span className="font-semibold text-slate-200 capitalize">{step.agent} Agent</span>
-                          <span className="text-slate-500 font-mono">
-                            {step.latency_ms ? `${step.latency_ms.toFixed(1)}ms` : step.duration_seconds ? `${(step.duration_seconds * 1000).toFixed(1)}ms` : "0ms"}
-                          </span>
-                        </div>
-                        {step.output_summary && <div className="text-slate-400">{step.output_summary}</div>}
-                        {step.model_name && (
-                          <div className="text-indigo-400 font-mono">Model: {step.model_name}</div>
-                        )}
-                        {step.error && <div className="text-rose-400 font-mono">Error: {step.error}</div>}
-                      </div>
-                    </div>
+                    </li>
                   ))}
-                </div>
+                </ul>
               </div>
-
-              {/* Citations */}
-              {selectedTrace.citations.length > 0 && (
-                <div className="space-y-2">
-                  <div className="text-xs font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-                    <ShieldCheck size={14} className="text-emerald-400" />
-                    Verified Citations
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {selectedTrace.citations.map((cite, i) => (
-                      <span key={i} className="text-xs px-2.5 py-1 bg-slate-800 text-slate-300 rounded border border-slate-700 font-mono">
-                        {cite}
-                      </span>
+              {selected.citations.length > 0 && (
+                <div>
+                  <p className="kpi-label">Citations</p>
+                  <div className="chip-row">
+                    {selected.citations.map((c, i) => (
+                      <span key={i} className="chip">{c}</span>
                     ))}
                   </div>
                 </div>
               )}
-            </>
-          ) : (
-            <div className="h-full flex items-center justify-center text-slate-500 text-sm">
-              Select a trace on the left to inspect specialist decisions.
             </div>
           )}
-        </div>
+        </section>
       </div>
     </div>
   )
 }
-
 export default TraceExplorer

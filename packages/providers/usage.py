@@ -22,6 +22,15 @@ MODEL_PRICING_PER_1M: dict[str, tuple[float, float]] = {
 }
 
 
+def _percentile(sorted_values: list[float], fraction: float) -> float:
+    """Linear-interpolated percentile (numpy's default). Rounding the index down instead
+    hides the slowest requests from p95/p99 until there are ~100 samples."""
+    position = fraction * (len(sorted_values) - 1)
+    lower = int(position)
+    upper = min(lower + 1, len(sorted_values) - 1)
+    return sorted_values[lower] + (sorted_values[upper] - sorted_values[lower]) * (position - lower)
+
+
 class ProviderUsageRecord(BaseModel):
     """Telemetry record for a single model provider request."""
 
@@ -109,11 +118,9 @@ class UsageTracker:
     def estimate_cost(self, model_name: str, prompt_tokens: int, completion_tokens: int) -> float:
         """Calculate estimated cost in USD based on model pricing table."""
         model_lower = model_name.lower()
-        inp_rate, out_rate = 0.0, 0.0
-        for prefix, (inp, out) in MODEL_PRICING_PER_1M.items():
-            if prefix in model_lower:
-                inp_rate, out_rate = inp, out
-                break
+        # Longest match wins, so "gpt-4o-mini" is not billed at "gpt-4o" rates
+        matches = [prefix for prefix in MODEL_PRICING_PER_1M if prefix in model_lower]
+        inp_rate, out_rate = MODEL_PRICING_PER_1M[max(matches, key=len)] if matches else (0.0, 0.0)
         cost = (prompt_tokens * inp_rate + completion_tokens * out_rate) / 1_000_000.0
         return round(cost, 6)
 
@@ -135,9 +142,9 @@ class UsageTracker:
 
         latencies = sorted(r.latency_ms for r in records)
         avg_lat = sum(latencies) / total_req
-        p50 = latencies[int(0.50 * (total_req - 1))]
-        p95 = latencies[int(0.95 * (total_req - 1))]
-        p99 = latencies[int(0.99 * (total_req - 1))]
+        p50 = _percentile(latencies, 0.50)
+        p95 = _percentile(latencies, 0.95)
+        p99 = _percentile(latencies, 0.99)
 
         # Group by provider and model
         by_prov: dict[str, dict[str, Any]] = {}

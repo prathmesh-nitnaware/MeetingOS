@@ -2,6 +2,7 @@ from typing import Any
 
 from packages.common.models import AnswerWithAttribution, EvidenceItem, ReasoningContext
 from packages.memory.graph import GraphService
+from packages.nlp.interfaces import BaseEmbedder
 from packages.reasoning.interfaces import BaseReasoner
 from packages.reasoning.mock import MockReasoner
 from packages.reasoning.planner import QueryPlan, QueryPlanner
@@ -42,6 +43,7 @@ class RAGPipeline:
         planner: QueryPlanner | None = None,
         reasoner: BaseReasoner | None = None,
         org_id: str = "org_dev",
+        embedder: BaseEmbedder | None = None,
     ) -> None:
         if isinstance(planner, str):
             org_id, planner = planner, None
@@ -49,9 +51,13 @@ class RAGPipeline:
         self.org_id = org_id
         self.planner = planner or QueryPlanner()
         self.reasoner = reasoner or MockReasoner()
-        self.search_engine = HybridSearchEngine(session, org_id=org_id)
+        self.search_engine = HybridSearchEngine(session, embedder=embedder, org_id=org_id)
         self.graph_service = GraphService(session, org_id=org_id)
         self.temporal_engine = TemporalIntelligenceEngine(session, org_id=org_id)
+
+    @property
+    def reasoner_name(self) -> str:
+        return str(getattr(self.reasoner, "model_name", type(self.reasoner).__name__))
 
     async def answer_question(
         self,
@@ -123,7 +129,7 @@ class RAGPipeline:
                 confidence=0.0,
                 reasoning_path=reasoning_path
                 + ["No relevant evidence found in organizational memory."],
-                model_name="mock-reasoner",
+                model_name=self.reasoner_name,
                 model_version="1.0.0",
                 pipeline_version="1.0.0",
             )
@@ -148,7 +154,7 @@ class RAGPipeline:
             query_plan=plan,
             confidence=reasoner_result.confidence,
             reasoning_path=reasoning_path + reasoner_result.reasoning_path,
-            model_name="mock-reasoner",
+            model_name=self.reasoner_name,
             model_version="1.0.0",
             pipeline_version="1.0.0",
         )

@@ -4,29 +4,42 @@ from fastapi import HTTPException
 from fastapi.security import HTTPAuthorizationCredentials
 
 
-def test_get_current_user_valid_tokens():
+@pytest.mark.asyncio
+async def test_get_current_user_valid_tokens():
     admin_cred = HTTPAuthorizationCredentials(scheme="Bearer", credentials="admin-secret-token")
-    user = get_current_user(admin_cred)
+    user = await get_current_user(admin_cred)
     assert user.role == "admin"
     assert user.user_id == "admin-dev"
 
     member_cred = HTTPAuthorizationCredentials(scheme="Bearer", credentials="member-secret-token")
-    user = get_current_user(member_cred)
+    user = await get_current_user(member_cred)
     assert user.role == "member"
 
     viewer_cred = HTTPAuthorizationCredentials(scheme="Bearer", credentials="viewer-secret-token")
-    user = get_current_user(viewer_cred)
+    user = await get_current_user(viewer_cred)
     assert user.role == "viewer"
 
 
-def test_get_current_user_invalid_or_missing_token():
+@pytest.mark.asyncio
+async def test_get_current_user_invalid_or_missing_token():
     with pytest.raises(HTTPException) as exc_info:
-        get_current_user(None)  # pyright: ignore[reportArgumentType]
+        await get_current_user(None)  # pyright: ignore[reportArgumentType]
     assert exc_info.value.status_code == 401
 
     invalid_cred = HTTPAuthorizationCredentials(scheme="Bearer", credentials="invalid-token-xyz")
     with pytest.raises(HTTPException) as exc_info:
-        get_current_user(invalid_cred)
+        await get_current_user(invalid_cred)
+    assert exc_info.value.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_dev_tokens_rejected_outside_development(monkeypatch: pytest.MonkeyPatch):
+    from apps.api.config import settings
+
+    monkeypatch.setattr(settings, "app_env", "production")
+    admin_cred = HTTPAuthorizationCredentials(scheme="Bearer", credentials="admin-secret-token")
+    with pytest.raises(HTTPException) as exc_info:
+        await get_current_user(admin_cred)
     assert exc_info.value.status_code == 401
 
 

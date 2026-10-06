@@ -1,5 +1,5 @@
 from datetime import UTC, datetime
-from uuid import uuid4
+from uuid import NAMESPACE_URL, uuid5
 
 from packages.common.enums import (
     CommitmentStatus,
@@ -15,6 +15,11 @@ from packages.common.models import (
     NormalizedTemporal,
     TranscriptSegment,
 )
+
+
+def stable_fact_id(prefix: str, meeting_id: str, segment_id: str | None) -> str:
+    """Deterministic fact ID so re-running extraction keeps IDs (and history links) stable."""
+    return f"{prefix}-{uuid5(NAMESPACE_URL, f'{prefix}:{meeting_id}:{segment_id}')}"
 
 
 class FactExtractors:
@@ -58,7 +63,7 @@ class FactExtractors:
 
                 decisions.append(
                     ExtractedDecision(
-                        decision_id=f"dec-{uuid4()}",
+                        decision_id=stable_fact_id("dec", meeting_id, seg.segment_id),
                         subject=subject,
                         status=status,
                         rationale=f"Agreed during discussion by {seg.speaker_id}",
@@ -114,7 +119,7 @@ class FactExtractors:
 
                 commitments.append(
                     ExtractedCommitment(
-                        commitment_id=f"com-{uuid4()}",
+                        commitment_id=stable_fact_id("com", meeting_id, seg.segment_id),
                         description=text,
                         owner_id=owner,
                         status=CommitmentStatus.ASSIGNED
@@ -166,7 +171,7 @@ class FactExtractors:
 
                 issues.append(
                     ExtractedIssue(
-                        issue_id=f"iss-{uuid4()}",
+                        issue_id=stable_fact_id("iss", meeting_id, seg.segment_id),
                         description=text,
                         owner_id=seg.speaker_id,
                         status=status,

@@ -1,248 +1,153 @@
-import React, { useState, useEffect } from "react"
-import { useNavigate } from "react-router-dom"
-import { api, MeetingSummary } from "../services/api"
+import React, { useCallback, useEffect, useState } from "react"
+import { Link, useNavigate } from "react-router-dom"
+import { Plus, Search, Video } from "lucide-react"
+import { useAuth } from "../auth/AuthContext"
+import { Notice } from "../components/Notice"
 import { Spinner } from "../components/Spinner"
-import { Modal } from "../components/Modal"
 import { StatusBadge } from "../components/StatusBadge"
-import { Plus, Video, Calendar, Search, AlertCircle } from "lucide-react"
+import UploadMeetingModal from "../components/UploadMeetingModal"
+import { api, type MeetingSummary } from "../services/api"
+import { formatDate, formatDateTime, formatDuration } from "../utils/format"
+
+const PAGE_SIZE = 25
 
 export const MeetingsList: React.FC = () => {
   const navigate = useNavigate()
+  const { hasPermission } = useAuth()
   const [meetings, setMeetings] = useState<MeetingSummary[]>([])
+  const [total, setTotal] = useState(0)
+  const [page, setPage] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState("")
-
-  // Ingest Form States
   const [isModalOpen, setIsModalOpen] = useState(false)
-  const [title, setTitle] = useState("")
-  const [file, setFile] = useState<File | null>(null)
-  const [meetingDate, setMeetingDate] = useState("")
-  const [participants, setParticipants] = useState("")
-  const [asyncProcessing, setAsyncProcessing] = useState(false)
-  const [submitting, setSubmitting] = useState(false)
-  const [submitError, setSubmitError] = useState<string | null>(null)
 
-  const loadMeetings = async () => {
+  const loadMeetings = useCallback(async (pageIndex: number) => {
+    setLoading(true)
+    setError(null)
     try {
-      setLoading(true)
-      setError(null)
-      const data = await api.getMeetings(100, 0)
-      setMeetings(data)
-    } catch (err: any) {
-      setError(err.message || "Failed to load meetings.")
+      const res = await api.getMeetingsPage(PAGE_SIZE, pageIndex * PAGE_SIZE)
+      setMeetings(res.items)
+      setTotal(res.total)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load meetings.")
     } finally {
       setLoading(false)
     }
-  }
-
-  useEffect(() => {
-    loadMeetings()
   }, [])
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setFile(e.target.files[0])
-    }
-  }
+  useEffect(() => {
+    void loadMeetings(page)
+  }, [loadMeetings, page])
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!title || !file) {
-      setSubmitError("Title and Meeting File are required.")
-      return
-    }
-
-    setSubmitting(true)
-    setSubmitError(null)
-
-    try {
-      const formData = new FormData()
-      formData.append("file", file)
-      formData.append("title", title)
-      if (meetingDate) {
-        formData.append("meeting_date", meetingDate)
-      }
-      if (participants) {
-        const partsList = participants.split(",").map(p => p.trim()).filter(Boolean)
-        formData.append("participants", JSON.stringify(partsList))
-      }
-      formData.append("async_processing", String(asyncProcessing))
-
-      const res = await api.uploadMeeting(formData)
-      setIsModalOpen(false)
-      // Reset form
-      setTitle("")
-      setFile(null)
-      setMeetingDate("")
-      setParticipants("")
-      setAsyncProcessing(false)
-      
-      // Reload meetings list
-      loadMeetings()
-
-      // Redirect to detail
-      navigate(`/meetings/${res.meeting_id}`)
-    } catch (err: any) {
-      setSubmitError(err.message || "Failed to upload meeting.")
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
-  const filteredMeetings = meetings.filter((m) =>
-    m.title.toLowerCase().includes(searchTerm.toLowerCase())
-  )
-
-  if (loading) return <Spinner message="Fetching organizational meetings..." />
+  const filtered = meetings.filter((m) => m.title.toLowerCase().includes(searchTerm.toLowerCase()))
+  const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE))
 
   return (
     <div className="meetings-list-page">
       <header className="page-header">
         <div>
           <h1 className="page-title">Meeting Directory</h1>
-          <p className="page-subtitle">Manage, view, and analyze meeting recordings and transcript details.</p>
+          <p className="page-subtitle">Recordings, transcripts and their processing status.</p>
         </div>
-        <button className="btn btn-primary" onClick={() => setIsModalOpen(true)}>
-          <Plus size={16} />
-          <span>Ingest Meeting</span>
-        </button>
+        {hasPermission("meetings.create") && (
+          <button className="btn btn-primary" onClick={() => setIsModalOpen(true)}>
+            <Plus size={16} aria-hidden="true" />
+            <span>Ingest meeting</span>
+          </button>
+        )}
       </header>
 
       {error && (
-        <div className="error-state">
-          <AlertCircle size={20} />
-          <span>{error}</span>
-        </div>
+        <Notice tone="error">
+          {error}{" "}
+          <button type="button" className="link-evidence" onClick={() => void loadMeetings(page)}>
+            Retry
+          </button>
+        </Notice>
       )}
 
-      <div className="card search-box" style={{ marginBottom: "24px", display: "flex", alignItems: "center", padding: "12px 20px" }}>
-        <Search size={18} className="text-secondary" style={{ marginRight: "8px" }} />
+      <div className="card search-box inline-search">
+        <Search size={18} className="text-secondary" aria-hidden="true" />
+        <label htmlFor="meeting-filter" className="sr-only">
+          Filter meetings on this page by title
+        </label>
         <input
+          id="meeting-filter"
           type="text"
-          className="form-input"
-          style={{ border: "none", background: "none", padding: 0 }}
+          className="form-input bare-input"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          placeholder="Filter meetings by title..."
+          placeholder="Filter meetings on this page by title..."
         />
       </div>
 
       <section className="card">
-        {filteredMeetings.length === 0 ? (
+        {loading ? (
+          <Spinner message="Fetching meetings..." />
+        ) : filtered.length === 0 ? (
           <div className="empty-state">
-            <Video size={48} className="empty-state-icon" />
-            <p>{searchTerm ? "No meetings match your search query." : "No meetings are currently registered."}</p>
+            <Video size={48} className="empty-state-icon" aria-hidden="true" />
+            <p>{searchTerm ? "No meetings on this page match your filter." : "No meetings yet."}</p>
           </div>
         ) : (
           <div className="table-container">
             <table className="table">
               <thead>
                 <tr>
-                  <th>Meeting Title</th>
-                  <th>Meeting Date</th>
-                  <th>Source Type</th>
-                  <th>Processing Status</th>
-                  <th>Segments Count</th>
-                  <th>Ingested At</th>
+                  <th scope="col">Meeting</th>
+                  <th scope="col">Date</th>
+                  <th scope="col">Duration</th>
+                  <th scope="col">Source</th>
+                  <th scope="col">Status</th>
+                  <th scope="col">Segments</th>
+                  <th scope="col">Ingested</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredMeetings.map((m) => (
-                  <tr key={m.meeting_id} style={{ cursor: "pointer" }} onClick={() => navigate(`/meetings/${m.meeting_id}`)}>
-                    <td style={{ fontWeight: 600, color: "var(--accent-sky)" }}>{m.title}</td>
+                {filtered.map((m) => (
+                  <tr key={m.meeting_id}>
                     <td>
-                      <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
-                        <Calendar size={13} />
-                        {new Date(m.meeting_date).toLocaleDateString()}
-                      </span>
+                      <Link to={`/meetings/${m.meeting_id}`} className="table-link">
+                        {m.title}
+                      </Link>
                     </td>
+                    <td>{formatDate(m.meeting_date)}</td>
+                    <td>{formatDuration(m.duration_seconds)}</td>
                     <td><code>{m.source_type}</code></td>
-                    <td>
-                      <StatusBadge status={m.processing_status} />
-                    </td>
+                    <td><StatusBadge status={m.processing_status} /></td>
                     <td>{m.segment_count}</td>
-                    <td>{new Date(m.created_at).toLocaleString()}</td>
+                    <td>{formatDateTime(m.created_at)}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
         )}
+
+        {total > PAGE_SIZE && (
+          <nav className="pagination" aria-label="Meeting pages">
+            <button type="button" className="btn btn-outline" disabled={page === 0 || loading} onClick={() => setPage((p) => p - 1)}>
+              Previous
+            </button>
+            <span className="muted">
+              Page {page + 1} of {pageCount} · {total} meetings
+            </span>
+            <button type="button" className="btn btn-outline" disabled={page + 1 >= pageCount || loading} onClick={() => setPage((p) => p + 1)}>
+              Next
+            </button>
+          </nav>
+        )}
       </section>
 
-      {/* Ingestion Modal */}
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Upload and Ingest Meeting">
-        <form onSubmit={handleSubmit}>
-          {submitError && (
-            <div className="error-state" style={{ marginBottom: "16px" }}>
-              <AlertCircle size={16} />
-              <span>{submitError}</span>
-            </div>
-          )}
-          <div className="form-group">
-            <label className="form-label">Meeting Title *</label>
-            <input
-              type="text"
-              className="form-input"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="e.g. Sprint Sync"
-              required
-            />
-          </div>
-          <div className="form-group">
-            <label className="form-label">Meeting Date (YYYY-MM-DD or ISO)</label>
-            <input
-              type="text"
-              className="form-input"
-              value={meetingDate}
-              onChange={(e) => setMeetingDate(e.target.value)}
-              placeholder="e.g. 2026-08-25"
-            />
-          </div>
-          <div className="form-group">
-            <label className="form-label">Participants (comma separated)</label>
-            <input
-              type="text"
-              className="form-input"
-              value={participants}
-              onChange={(e) => setParticipants(e.target.value)}
-              placeholder="e.g. Sarah Connor, John Connor"
-            />
-          </div>
-          <div className="form-group">
-            <label className="form-label">Source File * (.wav, .mp3, .srt, .txt, .mp4)</label>
-            <input
-              type="file"
-              className="form-input"
-              onChange={handleFileChange}
-              accept=".wav,.mp3,.srt,.txt,.mp4"
-              required
-            />
-          </div>
-          <div className="form-group" style={{ flexDirection: "row", alignItems: "center", gap: "10px", marginTop: "10px" }}>
-            <input
-              type="checkbox"
-              id="asyncCheckboxMeetings"
-              checked={asyncProcessing}
-              onChange={(e) => setAsyncProcessing(e.target.checked)}
-            />
-            <label htmlFor="asyncCheckboxMeetings" className="form-label" style={{ margin: 0, cursor: "pointer" }}>
-              Process asynchronously via Celery Queue
-            </label>
-          </div>
-
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: "12px", marginTop: "24px" }}>
-            <button type="button" className="btn btn-outline" onClick={() => setIsModalOpen(false)} disabled={submitting}>
-              Cancel
-            </button>
-            <button type="submit" className="btn btn-primary" disabled={submitting}>
-              {submitting ? "Uploading..." : "Start Ingestion"}
-            </button>
-          </div>
-        </form>
-      </Modal>
+      <UploadMeetingModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onUploaded={(id) => {
+          setIsModalOpen(false)
+          navigate(`/meetings/${id}`)
+        }}
+      />
     </div>
   )
 }

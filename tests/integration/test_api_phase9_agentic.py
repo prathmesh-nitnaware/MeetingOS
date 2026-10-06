@@ -150,7 +150,9 @@ async def test_security_protected_endpoints_require_auth(async_client: AsyncClie
         if method == "GET":
             resp = await async_client.get(path, headers={"Authorization": ""})
         else:
-            resp = await async_client.post(path, json={"question": "test"}, headers={"Authorization": ""})
+            resp = await async_client.post(
+                path, json={"question": "test"}, headers={"Authorization": ""}
+            )
         assert resp.status_code == 401, (
             f"Expected 401 for unauthenticated {method} {path}, got {resp.status_code}"
         )

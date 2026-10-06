@@ -1,240 +1,247 @@
-import React, { useState, useEffect } from "react"
-import { Link } from "react-router-dom"
-import { api, GraphNode, EntityDetailResponse, EntityTimelineResponse } from "../services/api"
-import { Spinner } from "../components/Spinner"
+import React, { useCallback, useEffect, useId, useMemo, useState } from "react"
+import { Link, useSearchParams } from "react-router-dom"
+import { Cpu, FolderKanban, Network, Tag, Users } from "lucide-react"
 import { Modal } from "../components/Modal"
-import {
-  Network,
-  Users,
-  Calendar,
-  AlertCircle,
-  Tag,
-  GitCommit,
-  TrendingUp,
-  Link2,
-  FolderKanban,
-  Cpu
-} from "lucide-react"
+import { Notice } from "../components/Notice"
+import { Spinner } from "../components/Spinner"
+import { StatusBadge } from "../components/StatusBadge"
+import { api, type EntityDetailResponse, type EntityTimelineResponse, type GraphNode } from "../services/api"
+import { formatDate, humanize } from "../utils/format"
+
+// Must match packages/common/enums.py::EntityType
+const ENTITY_TYPES = ["PERSON", "ORGANIZATION", "PROJECT", "TECHNOLOGY", "PRODUCT", "LOCATION", "DATE"]
+const PAGE_SIZE = 60
+
+const EntityIcon: React.FC<{ type?: string | null }> = ({ type }) => {
+  switch ((type ?? "").toUpperCase()) {
+    case "PERSON":
+      return <Users size={16} className="text-accent-indigo" aria-hidden="true" />
+    case "PROJECT":
+      return <FolderKanban size={16} className="text-accent-emerald" aria-hidden="true" />
+    case "TECHNOLOGY":
+      return <Cpu size={16} className="text-accent-amber" aria-hidden="true" />
+    default:
+      return <Tag size={16} className="text-accent-sky" aria-hidden="true" />
+  }
+}
 
 export const EntitiesList: React.FC = () => {
+  const ids = useId()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [entities, setEntities] = useState<GraphNode[]>([])
+  const [hasMore, setHasMore] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [typeFilter, setTypeFilter] = useState("")
 
-  // Detailed Modal states
-  const [selectedEntityId, setSelectedEntityId] = useState<string | null>(null)
-  const [entityDetail, setEntityDetail] = useState<EntityDetailResponse | null>(null)
-  const [entityTimeline, setEntityTimeline] = useState<EntityTimelineResponse | null>(null)
-  const [loadingDetail, setLoadingDetail] = useState(false)
-  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [detail, setDetail] = useState<EntityDetailResponse | null>(null)
+  const [timeline, setTimeline] = useState<EntityTimelineResponse | null>(null)
+  const [detailLoading, setDetailLoading] = useState(false)
+  const [detailError, setDetailError] = useState<string | null>(null)
 
-  const loadEntities = async () => {
-    try {
+  const loadEntities = useCallback(
+    async (offset: number) => {
       setLoading(true)
       setError(null)
-      const data = await api.listCanonicalEntities(typeFilter || undefined, 100, 0)
-      setEntities(data)
-    } catch (err: any) {
-      setError(err.message || "Failed to load canonical entities.")
-    } finally {
-      setLoading(false)
-    }
-  }
+      try {
+        const page = await api.listCanonicalEntities(typeFilter || undefined, PAGE_SIZE, offset)
+        setEntities((prev) => (offset === 0 ? page : [...prev, ...page]))
+        setHasMore(page.length === PAGE_SIZE)
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to load entities.")
+      } finally {
+        setLoading(false)
+      }
+    },
+    [typeFilter]
+  )
 
   useEffect(() => {
-    loadEntities()
-  }, [typeFilter])
+    void loadEntities(0)
+  }, [loadEntities])
 
-  const handleEntityClick = async (entityId: string) => {
-    setSelectedEntityId(entityId)
-    setLoadingDetail(true)
-    setIsModalOpen(true)
-    try {
-      const [detailRes, timelineRes] = await Promise.all([
-        api.getEntityDetail(entityId),
-        api.getEntityTimeline(entityId)
-      ])
-      setEntityDetail(detailRes)
-      setEntityTimeline(timelineRes)
-    } catch (err: any) {
-      alert(`Failed to load entity details: ${err.message}`)
-      setIsModalOpen(false)
-    } finally {
-      setLoadingDetail(false)
-    }
+  const openEntity = useCallback(async (entityId: string) => {
+    setSelectedId(entityId)
+    setDetail(null)
+    setTimeline(null)
+    setDetailError(null)
+    setDetailLoading(true)
+    // Load both independently so one failing part does not hide the other
+    const [d, t] = await Promise.allSettled([api.getEntityDetail(entityId), api.getEntityTimeline(entityId)])
+    if (d.status === "fulfilled") setDetail(d.value)
+    else setDetailError(d.reason instanceof Error ? d.reason.message : "Could not load this entity.")
+    if (t.status === "fulfilled") setTimeline(t.value)
+    else if (d.status === "fulfilled") setDetailError("The entity's timeline could not be loaded.")
+    setDetailLoading(false)
+  }, [])
+
+  // Deep link from the meeting page: /entities?focus=<entity id>
+  useEffect(() => {
+    const focus = searchParams.get("focus")
+    if (focus) void openEntity(focus)
+  }, [searchParams, openEntity])
+
+  const closeEntity = () => {
+    setSelectedId(null)
+    if (searchParams.has("focus")) setSearchParams({}, { replace: true })
   }
 
-  const getEntityIcon = (type: string) => {
-    switch (type.toUpperCase()) {
-      case "PERSON":
-        return <Users size={16} className="text-accent-indigo" />
-      case "PROJECT":
-        return <FolderKanban size={16} className="text-accent-emerald" />
-      case "TECHNOLOGY":
-        return <Cpu size={16} className="text-accent-amber" />
-      default:
-        return <Tag size={16} className="text-accent-sky" />
-    }
-  }
+  const neighbourNames = useMemo(
+    () => new Map((detail?.related_entities ?? []).map((n) => [n.id, n.name])),
+    [detail]
+  )
 
-  if (loading) return <Spinner message="Mapping canonical entities..." />
+  const timelineEmpty =
+    !timeline ||
+    (timeline.events.length === 0 &&
+      timeline.decisions.length === 0 &&
+      timeline.commitments.length === 0 &&
+      timeline.issues.length === 0)
 
   return (
     <div className="entities-list-page">
       <header className="page-header">
         <div>
-          <h1 className="page-title">Canonical Entities & Knowledge Graph</h1>
-          <p className="page-subtitle">Inspect resolved entities, aliases, relationships, and cross-meeting networks.</p>
+          <h1 className="page-title">Entities & Knowledge Graph</h1>
+          <p className="page-subtitle">People, projects and technologies mentioned across your meetings.</p>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-          <span className="form-label" style={{ margin: 0 }}>Filter Type:</span>
-          <select
-            className="form-select"
-            style={{ width: "180px" }}
-            value={typeFilter}
-            onChange={(e) => setTypeFilter(e.target.value)}
-          >
-            <option value="">All Types</option>
-            <option value="PERSON">PERSON</option>
-            <option value="TECHNOLOGY">TECHNOLOGY</option>
-            <option value="PROJECT">PROJECT</option>
-            <option value="ORGANIZATION">ORGANIZATION</option>
-            <option value="LOCATION">LOCATION</option>
+        <div className="inline-field">
+          <label className="form-label" htmlFor={`${ids}-type`}>Type</label>
+          <select id={`${ids}-type`} className="form-select" value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
+            <option value="">All types</option>
+            {ENTITY_TYPES.map((t) => (
+              <option key={t} value={t}>{humanize(t)}</option>
+            ))}
           </select>
         </div>
       </header>
 
-      {error && (
-        <div className="error-state">
-          <AlertCircle size={20} />
-          <span>{error}</span>
-        </div>
-      )}
+      {error && <Notice tone="error">{error}</Notice>}
 
-      {entities.length === 0 ? (
+      {loading && entities.length === 0 ? (
+        <Spinner message="Mapping entities..." />
+      ) : entities.length === 0 ? (
         <div className="card empty-state">
-          <Network size={48} className="empty-state-icon" />
-          <p>No canonical entities found in organizational memory.</p>
+          <Network size={48} className="empty-state-icon" aria-hidden="true" />
+          <p>No entities found yet. They are extracted automatically when meetings are ingested.</p>
         </div>
       ) : (
-        <section className="entities-grid">
-          {entities.map((ent) => (
-            <div key={ent.id} className="card entity-card" onClick={() => handleEntityClick(ent.id)}>
-              <div>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <span className="entity-type-badge">{ent.type}</span>
-                  {getEntityIcon(ent.type)}
+        <>
+          <section className="entities-grid">
+            {entities.map((ent) => (
+              <button key={ent.id} type="button" className="card entity-card" onClick={() => void openEntity(ent.id)}>
+                <div className="entity-card-top">
+                  <span className="entity-type-badge">{ent.entity_type}</span>
+                  <EntityIcon type={ent.entity_type} />
                 </div>
                 <h3 className="entity-name">{ent.name}</h3>
-              </div>
-              <div className="entity-presence" style={{ marginTop: "16px" }}>
-                Mentioned in {ent.presence_count} meetings
-              </div>
+                <div className="entity-presence">
+                  Mentioned in {ent.meeting_count} meeting{ent.meeting_count === 1 ? "" : "s"}
+                </div>
+              </button>
+            ))}
+          </section>
+          {hasMore && (
+            <div className="load-more">
+              <button type="button" className="btn btn-outline" disabled={loading} onClick={() => void loadEntities(entities.length)}>
+                {loading ? "Loading…" : "Load more"}
+              </button>
             </div>
-          ))}
-        </section>
+          )}
+        </>
       )}
 
-      {/* Detailed Entity neighborhood modal */}
-      <Modal
-        isOpen={isModalOpen}
-        onClose={() => { setIsModalOpen(false); setEntityDetail(null); setEntityTimeline(null); }}
-        title={`Entity Detail: ${selectedEntityId}`}
-      >
-        {loadingDetail && <Spinner message="Loading entity neighborhood, relations, and history..." />}
-        
-        {!loadingDetail && entityDetail && (
-          <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
-            {/* Metadata and aliases card */}
-            <div className="card" style={{ padding: "16px" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "12px" }}>
-                <span className="badge badge-queued">{entityDetail.entity.entity_type}</span>
-                <span style={{ fontSize: "13px", color: "var(--text-secondary)" }}>
-                  Present in {entityDetail.meetings_count} meetings
+      <Modal isOpen={selectedId !== null} onClose={closeEntity} title={detail?.entity.name ?? "Entity"} wide>
+        {detailLoading && <Spinner message="Loading entity..." />}
+        {detailError && <Notice tone="error">{detailError}</Notice>}
+
+        {!detailLoading && detail && (
+          <div className="stack">
+            <div className="card">
+              <div className="entity-card-top">
+                <span className="badge badge-queued">{detail.entity.entity_type}</span>
+                <span className="muted">
+                  In {detail.meetings_count} meeting{detail.meetings_count === 1 ? "" : "s"}
                 </span>
               </div>
-              <h2 className="entity-name" style={{ fontSize: "22px" }}>{entityDetail.entity.name}</h2>
-              {entityDetail.entity.aliases && entityDetail.entity.aliases.length > 0 && (
-                <div style={{ marginTop: "10px", fontSize: "13px", color: "var(--text-secondary)" }}>
-                  <span style={{ fontWeight: 600 }}>Resolved Aliases:</span>{" "}
-                  {entityDetail.entity.aliases.map((alias, i) => (
-                    <span key={i} className="badge" style={{ backgroundColor: "rgba(255,255,255,0.05)", marginLeft: "6px", textTransform: "none" }}>
-                      {alias}
-                    </span>
-                  ))}
-                </div>
+              <div className="chip-row">
+                {detail.meeting_ids.map((mid, index) => (
+                  <Link key={mid} to={`/meetings/${mid}`} className="chip" title={mid} onClick={closeEntity}>
+                    Open meeting {index + 1}
+                  </Link>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <h4 className="form-label">Relationships</h4>
+              {detail.relationships.length === 0 ? (
+                <p className="muted">No relationships recorded for this entity.</p>
+              ) : (
+                <ul className="relation-list">
+                  {detail.relationships.map((rel) => {
+                    const outgoing = rel.source_entity_id === detail.entity.entity_id
+                    const other = outgoing ? rel.target_entity_id : rel.source_entity_id
+                    return (
+                      <li key={rel.relation_id} className="graph-edge-card">
+                        <span className="graph-relation-type">
+                          {outgoing ? "" : "← "}
+                          {humanize(rel.relationship_type)}
+                          {outgoing ? " →" : ""}
+                        </span>
+                        <button type="button" className="link-evidence" onClick={() => void openEntity(other)}>
+                          {neighbourNames.get(other) ?? other}
+                        </button>
+                      </li>
+                    )
+                  })}
+                </ul>
               )}
             </div>
 
-            {/* Neighborhood Graph view */}
-            <div>
-              <h4 className="form-label" style={{ marginBottom: "10px" }}>Relational Neighborhood Graph</h4>
-              <div className="graph-neighborhood">
-                <div className="graph-root-node">{entityDetail.entity.name}</div>
-                
-                {entityDetail.relationships.length === 0 ? (
-                  <p style={{ alignSelf: "center", fontSize: "12px", color: "var(--text-muted)", marginTop: "12px" }}>
-                    No cross-meeting relationship links resolved for this node.
-                  </p>
-                ) : (
-                  <div className="graph-edges-container">
-                    {entityDetail.relationships.map((rel) => {
-                      const isSource = rel.source_entity_id.toLowerCase() === entityDetail.entity.entity_id.toLowerCase()
-                      const neighborId = isSource ? rel.target_entity_id : rel.source_entity_id
-                      return (
-                        <div key={rel.relation_id} className="graph-edge-card">
-                          <span className="graph-relation-type">
-                            {isSource ? "" : "← "}{rel.relationship_type}{isSource ? " →" : ""}
-                          </span>
-                          <span style={{ fontWeight: 600 }}>{neighborId}</span>
-                        </div>
-                      )
-                    })}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Entity Timeline stream */}
-            {entityTimeline && (
+            {timeline && (
               <div>
-                <h4 className="form-label" style={{ marginBottom: "10px" }}>Entity Lifecycle Timeline</h4>
-                {entityTimeline.events.length === 0 && entityTimeline.decisions.length === 0 && entityTimeline.commitments.length === 0 ? (
-                  <p style={{ fontSize: "12px", color: "var(--text-muted)" }}>
-                    No events tracked specifically for this entity.
-                  </p>
+                <h4 className="form-label">Related facts & events</h4>
+                {timelineEmpty ? (
+                  <p className="muted">No decisions, commitments, issues or events mention this entity.</p>
                 ) : (
-                  <div className="timeline-stream" style={{ maxHeight: "300px", overflowY: "auto", padding: "10px" }}>
-                    {entityTimeline.decisions.map((dec) => (
-                      <div key={dec.decision_id} className="timeline-event modified">
-                        <div className="timeline-node"></div>
-                        <div className="card timeline-card" style={{ padding: "12px" }}>
-                          <span className="timeline-type" style={{ color: "var(--accent-amber)", fontSize: "10px" }}>DECISION</span>
-                          <p style={{ fontSize: "13px", fontWeight: 600, color: "var(--text-primary)" }}>{dec.subject}</p>
-                          <span style={{ fontSize: "11px", color: "var(--text-muted)" }}>Status: {dec.status}</span>
+                  <div className="stack">
+                    {timeline.decisions.map((d) => (
+                      <div key={d.decision_id} className="fact-item accent-indigo">
+                        <div className="fact-header">
+                          <span className="kpi-label">Decision</span>
+                          <StatusBadge status={d.status} />
                         </div>
+                        <p>{d.subject}</p>
                       </div>
                     ))}
-                    {entityTimeline.commitments.map((com) => (
-                      <div key={com.commitment_id} className="timeline-event detected">
-                        <div className="timeline-node"></div>
-                        <div className="card timeline-card" style={{ padding: "12px" }}>
-                          <span className="timeline-type" style={{ color: "var(--accent-sky)", fontSize: "10px" }}>COMMITMENT</span>
-                          <p style={{ fontSize: "13px", fontWeight: 600, color: "var(--text-primary)" }}>{com.description}</p>
-                          <span style={{ fontSize: "11px", color: "var(--text-muted)" }}>Owner: {com.owner_id} • Status: {com.status}</span>
+                    {timeline.commitments.map((c) => (
+                      <div key={c.commitment_id} className="fact-item accent-emerald">
+                        <div className="fact-header">
+                          <span className="kpi-label">Commitment</span>
+                          <StatusBadge status={c.status} />
                         </div>
+                        <p>{c.description}</p>
+                        {c.current_deadline && <p className="muted">Due {formatDate(c.current_deadline)}</p>}
                       </div>
                     ))}
-                    {entityTimeline.events.map((evt) => (
-                      <div key={evt.event_id} className="timeline-event">
-                        <div className="timeline-node"></div>
-                        <div className="card timeline-card" style={{ padding: "12px" }}>
-                          <span className="timeline-type" style={{ color: "var(--accent-indigo)", fontSize: "10px" }}>{evt.event_type}</span>
-                          <p style={{ fontSize: "13px", color: "var(--text-primary)" }}>
-                            Occurred in meeting <code>{evt.meeting_id}</code>
-                          </p>
+                    {timeline.issues.map((i) => (
+                      <div key={i.issue_id} className="fact-item accent-amber">
+                        <div className="fact-header">
+                          <span className="kpi-label">Issue</span>
+                          <StatusBadge status={i.status} />
                         </div>
+                        <p>{i.description}</p>
+                      </div>
+                    ))}
+                    {timeline.events.map((e) => (
+                      <div key={e.event_id} className="fact-item">
+                        <div className="fact-header">
+                          <span className="kpi-label">{humanize(e.event_type)}</span>
+                          <span className="muted">{formatDate(e.occurred_at)}</span>
+                        </div>
+                        <p className="muted">In: {e.meeting_title || e.meeting_id}</p>
                       </div>
                     ))}
                   </div>

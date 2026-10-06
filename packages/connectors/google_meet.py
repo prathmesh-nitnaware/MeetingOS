@@ -8,7 +8,7 @@ from packages.common.models import (
     SpeakerInfo,
     TranscriptSegment,
 )
-from packages.connectors.base import BaseMeetingConnector
+from packages.connectors.base import BaseMeetingConnector, is_placeholder
 from packages.connectors.models import (
     ConnectorConfig,
     ConnectorMeeting,
@@ -20,11 +20,13 @@ from packages.connectors.models import (
 class GoogleMeetMeetingConnector(BaseMeetingConnector):
     """Google Meet meeting connector parsing Google Calendar and Meet transcripts to CMF."""
 
+    display_name = "Google Meet"
+
     def get_provider_name(self) -> str:
         return "google_meet"
 
     def validate_config(self, config: ConnectorConfig) -> bool:
-        return bool(config.client_id and config.client_secret)
+        return not any(is_placeholder(getattr(config, f)) for f in ("client_id", "client_secret"))
 
     async def authenticate(self, config: ConnectorConfig) -> bool:
         if not self.validate_config(config):
@@ -34,18 +36,14 @@ class GoogleMeetMeetingConnector(BaseMeetingConnector):
         # OAuth client flow using Google credentials.
         if config.client_secret == "invalid-secret":
             raise ValueError("Authentication failed: Invalid Google Client credentials.")
-        return True
+        if self.is_demo(config):
+            return True
+        raise self.not_implemented()
 
     async def list_meetings(self, config: ConnectorConfig) -> list[ConnectorMeeting]:
-        if not await self.authenticate(config):
-            return []
-
-        # Real API Integration Point:
-        # GET https://www.googleapis.com/calendar/v3/calendars/primary/events
-        # filtering events with conferenceData indicating a Google Meet conference.
-        if config.client_secret == "mock-secret":
-            return self.get_mock_meetings()
-        return []
+        # Raises for non-demo credentials: the live API call is not implemented yet.
+        await self.authenticate(config)
+        return self.get_mock_meetings()
 
     def normalize_to_cmf(self, ext_meeting: ConnectorMeeting) -> Meeting:
         participants = [

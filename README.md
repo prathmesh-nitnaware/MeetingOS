@@ -11,7 +11,7 @@
 [![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://docs.docker.com/compose/)
 [![License](https://img.shields.io/badge/License-Proprietary-red?style=for-the-badge)](LICENSE)
 
-[![Tests](https://img.shields.io/badge/Tests-170%20Passed-brightgreen?style=flat-square)](tests/)
+[![Tests](https://img.shields.io/badge/Tests-197%20Passing-brightgreen?style=flat-square)](tests/)
 [![Ruff](https://img.shields.io/badge/Ruff-Clean-brightgreen?style=flat-square)](https://docs.astral.sh/ruff/)
 [![Pyright](https://img.shields.io/badge/Pyright-0%20Errors-brightgreen?style=flat-square)](https://github.com/microsoft/pyright)
 [![Release](https://img.shields.io/badge/Release-v1.0.0--rc1-blue?style=flat-square)](https://github.com/prathmesh-nitnaware/MeetingOS)
@@ -125,7 +125,7 @@ MeetingOS was empirically evaluated against a **75-question compositional organi
 | Frontend | React 18 + Vite + TypeScript | latest | Web observability UI |
 | Linting | Ruff | >=0.6.0 | Zero-error Python code quality |
 | Type Checking | Pyright | >=1.1.378 | Static type safety |
-| Testing | Pytest | >=8.3.0 | 170-test automated suite |
+| Testing | Pytest | >=8.3.0 | 197-test automated suite |
 | Containerization | Docker Compose | -- | Dev + 9-service production profile |
 
 ---
@@ -328,7 +328,7 @@ MeetingOS/
 |-- workers/                    # Celery background workers
 |-- evaluation/                 # Empirical research harnesses and reports
 |-- datasets/                   # Curated synthetic CMF meeting fixtures
-|-- tests/                      # Automated test suite (170 tests)
+|-- tests/                      # Automated test suite (197 tests)
 |-- scripts/                    # Utility scripts (seed, backup, restore)
 |-- alembic/                    # Alembic async database migrations
 |-- docs/                       # Comprehensive specifications and ADRs
@@ -388,7 +388,7 @@ All endpoints are served under `/api/v1`. Authentication uses Bearer tokens with
 | `GET` | `/api/v1/admin/metrics/usage` | Viewer | Provider tokens, latency and cost telemetry |
 | `GET` | `/api/v1/admin/providers/status` | Viewer | Active AI provider configuration status |
 
-Once running, visit **http://localhost:8000/docs** for interactive Swagger UI.
+Once running, visit **http://localhost:8000/api/v1/docs** for interactive Swagger UI.
 
 ---
 
@@ -420,7 +420,7 @@ class Meeting(BaseSchema):
     title: str
     meeting_date: datetime
     duration_seconds: float | None
-    source_type: SourceType          # audio | video | subtitle | text | connector
+    source_type: SourceType  # audio | video | subtitle | text | connector
     processing_status: ProcessingStatus
     participants: list[Participant]
     speakers: list[SpeakerInfo]
@@ -456,21 +456,31 @@ class Meeting(BaseSchema):
 
 ## 12. Security Model
 
+### Authentication
+
+- Email + password sign-in (PBKDF2-SHA256, 600k iterations) issues an HS256 JWT scoped to one organization. Every request re-checks the membership in the database, so removed or suspended members lose access immediately.
+- Registering an organization with an email that already has an account requires that account's password.
+- Development tokens (`admin-secret-token`, ...) only work when `APP_ENV` is `development`/`test`.
+- Production refuses to start with default/placeholder secrets, the default database password, debug mode or wildcard CORS.
+
 ### Role-Based Access Control (RBAC)
 
 | Role | Permissions |
 |:---|:---|
-| `admin` | Full system: retention cleanup, audit log inspection, system settings |
-| `member` | Ingestion: meeting upload, NLP extraction, connector sync |
-| `viewer` | Read-only: queries, search, graph exploration, trace inspection, metrics |
+| `owner` | Everything, including deleting the organization |
+| `admin` | Delete meetings, retention cleanup, audit log, connector sync, invite members (up to admin) |
+| `member` | Upload meetings, re-run extraction, reconcile history, ask questions |
+| `viewer` | Read-only: meetings, search, questions, graph, traces, metrics |
+
+Every query, history lookup, reconciliation, retention cleanup, agent trace and job status is scoped to the caller's organization. Soft-deleted meetings are excluded from search, answers, the dashboard, entities and timelines.
 
 ### Additional Security Controls
 
-- **Rate Limiting** (`apps/api/rate_limiter.py`): Redis sliding-window per IP/API token with configurable limits per endpoint category
+- **Rate Limiting** (`apps/api/rate_limiter.py`): Redis sliding-window per signed-in user or client IP on sign-in, upload, query, agentic and admin endpoints
 - **Secret Sanitization** (`packages/agents/traces.py`): Recursive scrubber replaces API keys, passwords, bearer tokens with `[REDACTED]` in all persisted traces
-- **Data Retention** (`packages/memory/retention.py`): Configurable policies with soft/hard deletion cascades and GDPR-compliant deletion support
+- **Data Retention** (`packages/memory/retention.py`): Per-organization cleanup (meetings, transcripts, evidence, uploaded audio, audit logs); saved policies with auto-delete are applied on a schedule
 - **Prompt Injection Defense**: Evidence gating in `EvidenceAgent` prevents adversarial meeting content from influencing synthesis
-- **Production Security Checks**: Config validator enforces non-default secret keys before production startup
+- **Production Security Checks**: Config validator rejects default or placeholder secrets, the default database password, debug mode and wildcard CORS before production startup
 
 ---
 
@@ -480,7 +490,7 @@ class Meeting(BaseSchema):
 |:---|:---|:---|
 | UsageTracker | `packages/providers/usage.py` | Prompt/completion tokens, latency p50/p95/p99, error rates, estimated costs |
 | TraceStore | `packages/agents/traces.py` | Multi-agent cognitive step traces, confidence scores, conflict timelines |
-| Health Probes | `/api/v1/health` | Database connectivity, Redis, pgvector extension availability |
+| Health Probes | `/api/v1/health`, `/health/ready`, `/health/live` | Database and Redis connectivity; no tenant data or configuration |
 | WorkerTelemetry | `workers/` | Per-queue throughput across asr/nlp/embedding/sync queues |
 
 ### Frontend Observability Pages
@@ -502,159 +512,111 @@ class Meeting(BaseSchema):
 
 ## 14. Quickstart
 
-### Single-Command Start (Recommended)
+### Prerequisites
 
-Run the entire system (Docker infrastructure, database migrations, FastAPI backend, React web frontend, and Celery workers) with one command:
+- Python 3.12 and [uv](https://docs.astral.sh/uv/) (`pip install uv`)
+- Docker Desktop (runs PostgreSQL + Redis)
+- Node.js 20.19+ or 22+ (web frontend)
 
-```bash
-# Python (Cross-platform)
-python run_all.py
-
-# Or with uv
-uv run python run_all.py
-
-# Windows PowerShell
-.\run_all.ps1
-
-# Windows Command Prompt
-run_all.bat
-```
-
-> [!TIP]
-> **Options for `run_all`:**
-> - `python run_all.py --open` to automatically launch the web browser once ready.
-> - `python run_all.py --no-docker` if your database is hosted remotely (e.g. Neon) and you don't need local Docker.
-> - `python run_all.py --no-worker` to run only the API and Web UI without Celery.
-> - Press `Ctrl+C` in the terminal to cleanly terminate all processes simultaneously.
-
-Services will be accessible at:
-- **Web Frontend**: [http://localhost:5173](http://localhost:5173)
-- **API Server**: [http://localhost:8000](http://localhost:8000)
-- **Interactive Swagger Docs**: [http://localhost:8000/api/v1/docs](http://localhost:8000/api/v1/docs)
-- **Health Check Probe**: [http://localhost:8000/api/v1/health](http://localhost:8000/api/v1/health)
-
----
-
-### Step-by-Step Manual Setup
-
-If you prefer to start each component in individual terminal windows:
-
-#### Prerequisites
-
-- Python >= 3.12
-- [uv](https://docs.astral.sh/uv/) (recommended) or pip
-- Docker and Docker Compose (for PostgreSQL + Redis)
-- Node.js >= 18 (for frontend only)
-
-#### 1. Clone and Install Dependencies
+### One-time setup
 
 ```bash
-git clone https://github.com/prathmesh-nitnaware/MeetingOS.git
-cd MeetingOS
+# Python dependencies, including real speech-to-text (faster-whisper)
+uv sync --dev --extra asr
 
-# Install with uv (recommended)
-uv sync --dev
+# Configuration (defaults work for local development)
+cp .env.example .env
 
-# Or with pip
-pip install -e ".[dev]"
+# Frontend dependencies
+cd apps/web && npm install && cd ../..
 ```
 
-#### 2. Start Infrastructure
+The first audio upload downloads the Whisper model (`MEETINGOS_WHISPER_MODEL`, default `base`, about 150 MB). Skip `--extra asr` if you only upload `.txt` / `.srt` transcripts.
+
+### Start everything
+
+```bash
+uv run python run_all.py          # or .\run_all.ps1 / run_all.bat on Windows
+```
+
+`run_all.py` starts Docker (Postgres + Redis), applies the database migrations (and stops if they fail), then starts the API, a Celery worker (with `--pool=solo` on Windows) and the web frontend. A process that exits is restarted up to three times. Options: `--open`, `--no-docker` (remote database), `--no-worker`, `--no-web`, `--no-migrate`.
+
+Services:
+- **Web app**: [http://localhost:5173](http://localhost:5173)
+- **API**: [http://localhost:8000](http://localhost:8000) — Swagger docs at [/api/v1/docs](http://localhost:8000/api/v1/docs)
+- **Health**: [/api/v1/health](http://localhost:8000/api/v1/health) (readiness: `/api/v1/health/ready`)
+
+### Signing in
+
+- **Development**: the sign-in page lists development personas (admin, member, viewer, owner of `org_dev`, plus a second tenant `org_beta`). They exist only when `APP_ENV` is `development`/`test` and `MEETINGOS_ENABLE_DEV_AUTH=true`, and are always disabled in production.
+- **Real accounts**: choose **Create organization** on the sign-in page (email + password of at least 8 characters). Invite colleagues from the API (`POST /api/v1/organizations/current/invitations`).
+
+### Manual start (separate terminals)
 
 ```bash
 docker compose up -d
-docker compose ps
-```
-
-#### 3. Configure Environment
-
-```bash
-cp .env.example .env
-# Edit .env with your settings
-```
-
-Minimum required for local development:
-
-```env
-DATABASE_URL=postgresql+asyncpg://meetingos:meetingos_secret_password@localhost:5432/meetingos_db
-REDIS_URL=redis://localhost:6379/0
-```
-
-Everything else uses safe defaults.
-
-#### 4. Initialize the Database
-
-```bash
 uv run alembic upgrade head
-```
-
-#### 5. Start the API Server
-
-```bash
 uv run uvicorn apps.api.main:app --host 0.0.0.0 --port 8000 --reload
+uv run celery -A workers.celery_app worker --loglevel=info -Q default,meetingos.asr,meetingos.sync   # add --pool=solo on Windows
+cd apps/web && npm run dev
 ```
 
-API documentation: **http://localhost:8000/docs**
+The API never creates tables itself on PostgreSQL; if the schema is behind, it logs an error asking you to run `alembic upgrade head`.
 
-#### 6. Start the Frontend
+### Production (Docker Compose)
 
 ```bash
-cd apps/web
-npm install
-npm run dev
-# Runs at http://localhost:5173
+# .env must set POSTGRES_PASSWORD, REDIS_PASSWORD, MEETINGOS_SECRET_KEY (32+ random chars)
+# and MEETINGOS_ALLOWED_ORIGINS for your domain
+docker compose -f docker-compose.prod.yml up -d --build
 ```
 
-#### 7. Start Celery Workers (Optional)
+The API container runs migrations before serving. Uploads and the Whisper model cache live in named volumes shared by the API and the ASR worker. Postgres and Redis are not published to the host, and Redis requires a password.
 
-```bash
-uv run celery -A workers.celery_app worker --loglevel=info \
-  -Q meetingos.asr,meetingos.nlp,meetingos.embedding,meetingos.sync
-```
+### Known limitations
 
-#### Production Deployment
-
-```bash
-docker compose -f docker-compose.prod.yml up -d
-```
+- **Meeting connectors** (Teams, Zoom, Google Meet): live API integrations are not implemented. With client secret `mock-secret` a connector runs in demo mode and imports sample meetings; real credentials report "not implemented" instead of pretending to connect.
+- **Speaker separation**: not included (it needs pyannote and large models). Audio transcripts are attributed to a single speaker; text transcripts in `Name: text` form keep their speakers.
+- **Speed**: Whisper runs on the CPU by default. Long recordings take minutes, so tick *Process in the background* when uploading. Set `MEETINGOS_ASR_DEVICE=cuda` and `MEETINGOS_WHISPER_COMPUTE_TYPE=float16` on a GPU.
+- **Usage metrics** (Observability page) are kept in memory per API process and reset on restart. Agent traces are stored in the database.
 
 ---
 
 ## 15. Configuration Reference
 
-Copy `.env.example` to `.env`. See [`.env.example`](.env.example) for the full canonical contract.
+Copy `.env.example` to `.env`; it documents every variable. Leave optional credentials empty (placeholder text counts as "not configured").
 
-| Variable | Required | Default | Purpose |
-|:---|:---:|:---|:---|
-| `DATABASE_URL` | Prod | `postgresql+asyncpg://...` | Async database connection URL |
-| `REDIS_URL` | No | `redis://localhost:6379/0` | Redis connection |
-| `MEETINGOS_SECRET_KEY` | Prod | (change this) | RBAC token signing key |
-| `MEETINGOS_ALLOWED_ORIGINS` | No | `["http://localhost:5173"]` | CORS allowed origins |
-| `APP_ENV` | No | `development` | `development` or `production` |
-| `APP_DEBUG` | No | `true` | Disable in production |
-| `UPLOAD_STORAGE_DIR` | No | `./data/uploads` | Meeting file upload directory |
-| `MAX_UPLOAD_SIZE_MB` | No | `500` | Max file upload size (MB) |
-| `ASR_PROVIDER` | No | `mock` | `mock` or `whisper` |
-| `DIARIZER_PROVIDER` | No | `mock` | `mock` or `pyannote` |
-| `MEETINGOS_EMBEDDING_PROVIDER` | No | `mock` | `mock`, `local_semantic`, `openai`, `gemini` |
-| `MEETINGOS_REASONER_PROVIDER` | No | `mock` | `mock`, `local_evidence`, `openai`, `anthropic`, `gemini` |
-| `MEETINGOS_EMBEDDING_API_KEY` | If OpenAI | -- | OpenAI or Gemini embedding API key |
-| `MEETINGOS_REASONER_API_KEY` | If cloud | -- | OpenAI or Anthropic or Gemini API key |
-| `MEETINGOS_ANTHROPIC_API_KEY` | If Anthropic | -- | Anthropic Claude API key |
-| `MEETINGOS_GEMINI_API_KEY` | If Gemini | -- | Google Gemini API key |
-| `TEAMS_ENABLED` | No | `false` | Enable Microsoft Teams connector |
-| `ZOOM_ENABLED` | No | `false` | Enable Zoom connector |
-| `GOOGLE_MEET_ENABLED` | No | `false` | Enable Google Meet connector |
-| `MEETINGOS_RATE_LIMIT_QUERY` | No | `60` | Query endpoint rate limit (req/min) |
-| `MEETINGOS_RATE_LIMIT_UPLOAD` | No | `10` | Upload endpoint rate limit (req/min) |
-| `MEETINGOS_RATE_LIMIT_AGENTIC` | No | `20` | Agentic query rate limit (req/min) |
+| Variable | Default | Purpose |
+|:---|:---|:---|
+| `APP_ENV` | `development` | `development`, `test`, `staging` or `production` (production enables strict checks) |
+| `MEETINGOS_SECRET_KEY` | dev value | Token signing key; production requires 32+ random characters |
+| `MEETINGOS_ENABLE_DEV_AUTH` | `true` | Development sign-in personas (never active in production) |
+| `MEETINGOS_ALLOWED_ORIGINS` | localhost:5173 | Browser origins allowed by CORS |
+| `DATABASE_URL` | local Postgres | Async SQLAlchemy URL (`postgresql+asyncpg://…`) |
+| `REDIS_URL` | `redis://localhost:6379/0` | Redis for Celery and rate limiting |
+| `CELERY_BROKER_URL` / `CELERY_RESULT_BACKEND` | `REDIS_URL` | Optional separate broker/result store |
+| `MEETINGOS_USE_CELERY` | `true` | `false` runs background uploads inside the API process |
+| `UPLOAD_STORAGE_DIR` | `./data/uploads` | Where uploaded files are stored |
+| `MAX_UPLOAD_SIZE_MB` | `500` | Maximum upload size |
+| `ASR_PROVIDER` | `whisper` | `whisper` (real) or `mock` (canned demo transcript) |
+| `DIARIZER_PROVIDER` | `none` | `none` (single speaker) or `mock` |
+| `MEETINGOS_WHISPER_MODEL` | `base` | `tiny`, `base`, `small`, `medium`, `large-v3` |
+| `MEETINGOS_ASR_DEVICE` | `cpu` | `cpu`, `cuda` or `auto` |
+| `MEETINGOS_REASONER_PROVIDER` | `local` | `local`, `anthropic`, `openai`, `gemini`, `mock` |
+| `MEETINGOS_EMBEDDING_PROVIDER` | `local` | `local`, `sentence_transformers`, `openai`, `gemini`, `mock` |
+| `MEETINGOS_ANTHROPIC_API_KEY` / `MEETINGOS_ANTHROPIC_MODEL` | — / `claude-opus-5-5` | Claude answers |
+| `MEETINGOS_REASONER_API_KEY` / `MEETINGOS_EMBEDDING_API_KEY` | — | OpenAI (or compatible) keys |
+| `MEETINGOS_GEMINI_API_KEY` / `MEETINGOS_GEMINI_MODEL` | — / `gemini-2.5-flash` | Gemini answers and embeddings |
+| `MEETINGOS_RATE_LIMIT_*` | 60 / 10 / 20 / 30 / 10 | Per-minute limits for query, upload, agentic, admin and sign-in |
+| `MEETINGOS_RETENTION_INTERVAL_HOURS` | `24` | How often saved retention policies with auto-delete run |
+| `TEAMS_ENABLED`, `ZOOM_ENABLED`, `GOOGLE_MEET_ENABLED` | `false` | Connectors (demo mode only, see limitations) |
 
 ---
 
 ## 16. Testing
 
 ```bash
-# Run all 170 tests
+# Run all tests (197; the PostgreSQL compatibility test runs when MEETINGOS_TEST_POSTGRES_URL is set)
 uv run pytest
 
 # With coverage report
@@ -673,27 +635,23 @@ uv run pytest -v
 ### Test Suite Summary
 
 ```
-============================= test session results ==============================
-platform win32 -- Python 3.12.10, pytest-9.1.1, pluggy-1.6.0
-collected 170 items
+collected 197 items
 
-tests/integration/test_api_meetings.py ............              [  7%]
-tests/integration/test_api_phase12_traces_metrics.py ..          [  8%]
-tests/integration/test_api_phase9_agentic.py ........            [ 13%]
-tests/integration/test_pipeline_e2e_audio.py .                   [ 13%]
-tests/unit/test_agents_phase9.py .........                       [ 19%]
-tests/unit/test_cmf_models.py .........                          [ 24%]
-tests/unit/test_conflicts_phase12.py ..                          [ 25%]
-tests/unit/test_hardening_phase8.py ...........                  [ 32%]
-tests/unit/test_ingestion_pipeline.py ....                       [ 34%]
-tests/unit/test_nlp_extractors.py .......                        [ 38%]
-tests/unit/test_providers.py ..........                          [ 44%]
-tests/unit/test_providers_phase11.py .......                     [ 48%]
-tests/unit/test_providers_phase12.py ....                        [ 50%]
-... [all remaining tests] ...
+tests/integration/test_api_contracts.py .....
+tests/integration/test_api_meetings.py .....
+tests/integration/test_api_phase9_agentic.py ........
+tests/integration/test_multitenancy_isolation.py .......
+tests/integration/test_postgres_compat.py s        # runs when MEETINGOS_TEST_POSTGRES_URL is set
+tests/integration/test_security_and_correctness_fixes.py ..................
+tests/unit/test_agents_phase9.py .........
+tests/unit/test_hardening_phase8.py ...........
+tests/unit/test_rbac_matrix.py ......
+... [45 test files in total] ...
 
-============================== 170 passed in 52.41s ==============================
+======================= 196 passed, 1 skipped in 31.49s =======================
 ```
+
+Tests run hermetically: they use a throwaway SQLite database and mock providers, and ignore your `.env`. To run the PostgreSQL compatibility test, create an empty database and set `MEETINGOS_TEST_POSTGRES_URL=postgresql+asyncpg://meetingos:meetingos@localhost:5432/meetingos_test`.
 
 ### Code Quality
 

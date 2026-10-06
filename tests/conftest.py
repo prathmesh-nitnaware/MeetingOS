@@ -18,6 +18,45 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
+TEST_SETTINGS = {
+    "app_env": "test",
+    "enable_dev_auth": True,
+    # Deterministic offline providers (no model downloads, no network)
+    "asr_provider": "mock",
+    "diarizer_provider": "mock",
+    "embedding_provider": "mock",
+    "reasoner_provider": "mock",
+    # Never touch the developer's Redis / Celery or rate-limit the test client
+    "use_celery": False,
+    "rate_limiting_enabled": False,
+    # Connector credentials from the developer's .env must not leak into tests
+    "teams_enabled": False,
+    "teams_tenant_id": None,
+    "teams_client_id": None,
+    "teams_client_secret": None,
+    "zoom_enabled": False,
+    "zoom_account_id": None,
+    "zoom_client_id": None,
+    "zoom_client_secret": None,
+    "google_meet_enabled": False,
+    "google_client_id": None,
+    "google_client_secret": None,
+}
+
+
+@pytest.fixture(autouse=True)
+def hermetic_settings():
+    """Pin settings to test values for every test and restore them afterwards."""
+    saved = {
+        name: getattr(settings, name)
+        for name in [*TEST_SETTINGS, "database_url", "upload_storage_dir"]
+    }
+    for name, value in TEST_SETTINGS.items():
+        setattr(settings, name, value)
+    yield
+    for name, value in saved.items():
+        setattr(settings, name, value)
+
 
 @pytest.fixture
 def sample_meeting_data() -> dict:
@@ -121,6 +160,13 @@ async def async_client(tmp_path: Path) -> AsyncGenerator[AsyncClient, None]:
     engine = create_async_engine(test_db_url)
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+
+    # Back the dev tokens with real organisation/user rows (as the API does at startup)
+    from apps.api.dev_fixtures import ensure_dev_fixtures
+
+    async with async_sessionmaker(bind=engine, expire_on_commit=False)() as session:
+        await ensure_dev_fixtures(session)
+        await session.commit()
 
     test_app = create_app()
     transport = ASGITransport(app=test_app)

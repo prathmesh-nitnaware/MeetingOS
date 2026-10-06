@@ -2,6 +2,7 @@ import time
 
 from packages.agents.base import BaseAgent
 from packages.agents.context import AgentContext, AgentEvidence, AgentTraceItem
+from packages.nlp.interfaces import BaseEmbedder
 from packages.retrieval.search import HybridSearchEngine
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -9,8 +10,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 class RetrievalAgent(BaseAgent):
     """Retrieval Agent that interacts with HybridSearchEngine to retrieve grounded evidence candidates."""
 
-    def __init__(self, session: AsyncSession, org_id: str = "org_dev") -> None:
-        self.search_engine = HybridSearchEngine(session, org_id=org_id)
+    def __init__(
+        self,
+        session: AsyncSession,
+        org_id: str = "org_dev",
+        embedder: BaseEmbedder | None = None,
+    ) -> None:
+        self.search_engine = HybridSearchEngine(session, embedder=embedder, org_id=org_id)
 
     async def run(self, context: AgentContext) -> AgentContext:
         start_time = time.perf_counter()

@@ -11,6 +11,41 @@ from packages.reasoning.interfaces import BaseReasoner
 from packages.reasoning.mock import MockReasoner
 from pydantic import BaseModel, Field
 
+_QUESTION_STOP_WORDS = {
+    "the",
+    "and",
+    "for",
+    "what",
+    "which",
+    "who",
+    "whom",
+    "when",
+    "where",
+    "why",
+    "how",
+    "did",
+    "does",
+    "was",
+    "were",
+    "are",
+    "our",
+    "about",
+    "with",
+    "this",
+    "that",
+    "have",
+    "has",
+    "had",
+    "decide",
+    "decided",
+    "tell",
+    "show",
+    "any",
+    "all",
+    "there",
+    "from",
+}
+
 
 class StructuredReasonerOutput(BaseModel):
     """Strict JSON schema output requested from LLMs."""
@@ -56,20 +91,28 @@ class LocalEvidenceReasoner(BaseReasoner):
             f"Analyzed {len(evidence)} evidence segments.",
         ]
 
-        # 1. Extract chronological evidence ordering and facts
-        ordered_evidence = sorted(
-            evidence,
-            key=lambda e: (e.meeting_id, e.start_time),
-        )
+        # 1. Keep the retriever's relevance order, but put sentences that share content words
+        #    with the question first (stable sort keeps relevance order among equals).
+        q_terms = {
+            t
+            for t in re.findall(r"[a-z0-9]+", q_lower)
+            if len(t) > 2 and t not in _QUESTION_STOP_WORDS
+        }
+
+        def overlap(ev: EvidenceItem) -> int:
+            return len(q_terms & set(re.findall(r"[a-z0-9]+", ev.text_snapshot.lower())))
+
+        ordered_evidence = sorted(evidence, key=overlap, reverse=True)
+        best_overlap = overlap(ordered_evidence[0]) if ordered_evidence else 0
 
         extracted_claims: list[str] = []
         for ev in ordered_evidence:
             text = ev.text_snapshot.strip()
-            # Extract speaker prefix if present
-            if ":" in text:
-                parts = text.split(":", 1)
-                text = parts[1].strip()
-            extracted_claims.append(text)
+            # Drop a leading "Speaker Name:" prefix if present
+            if ":" in text and len(text.split(":", 1)[0]) <= 50:
+                text = text.split(":", 1)[1].strip()
+            if text and text not in extracted_claims:
+                extracted_claims.append(text)
 
         # 2. Contextual Timeline & Lifecycle Synthesis
         has_temporal_context = bool(context and context.timeline_events)
@@ -127,8 +170,14 @@ class LocalEvidenceReasoner(BaseReasoner):
                 if match:
                     combined_summary = combined_summary[: 250 + match.start() + 1]
             answer = f"Based on meeting records: {combined_summary}"
-            confidence = 0.88
+            confidence = 0.88 if best_overlap else 0.5
             reasoning_path.append("Extracted multi-segment factual grounding.")
+
+        if q_terms and best_overlap == 0:
+            reasoning_path.append(
+                "None of the evidence shares key terms with the question; answer confidence lowered."
+            )
+            confidence = min(confidence, 0.5)
 
         elapsed_ms = (time.perf_counter() - t0) * 1000
         global_usage_tracker.record_usage(
@@ -347,7 +396,7 @@ def get_reasoner(
         from packages.providers.anthropic import AnthropicReasoner
 
         return AnthropicReasoner(
-            model_name=model_name or "claude-3-5-sonnet-20241022",
+            model_name=model_name or "claude-opus-5-5",
             base_url=base_url or "https://api.anthropic.com/v1",
             api_key=api_key,
         )
@@ -355,7 +404,7 @@ def get_reasoner(
         from packages.providers.gemini import GeminiReasoner
 
         return GeminiReasoner(
-            model_name=model_name or "gemini-1.5-flash",
+            model_name=model_name or "gemini-2.5-flash",
             base_url=base_url or "https://generativelanguage.googleapis.com",
             api_key=api_key,
         )

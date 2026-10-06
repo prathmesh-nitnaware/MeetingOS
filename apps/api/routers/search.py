@@ -3,6 +3,8 @@ from typing import Annotated
 
 from apps.api.auth import UserIdentity, require_viewer
 from apps.api.config import settings
+from apps.api.providers import build_embedder
+from apps.api.rate_limiter import rate_limit
 from fastapi import APIRouter, Depends, Query
 from packages.memory.database import get_db_session
 from packages.retrieval.search import HybridSearchEngine, SearchResponse
@@ -10,7 +12,10 @@ from packages.retrieval.search import HybridSearchEngine, SearchResponse
 router = APIRouter(prefix="/search", tags=["Search"])
 
 
-@router.get("", response_model=SearchResponse)
+search_rate_limit = rate_limit("query", lambda: settings.rate_limit_query_per_min)
+
+
+@router.get("", response_model=SearchResponse, dependencies=[Depends(search_rate_limit)])
 async def search_organizational_memory(
     q: Annotated[
         str, Query(description="Query string for hybrid semantic and keyword search")
@@ -30,7 +35,7 @@ async def search_organizational_memory(
 ) -> SearchResponse:
     """Multi-channel hybrid search across organisational memory (lexical keyword + semantic vector embeddings)."""
     async with get_db_session(settings.database_url) as session:
-        engine = HybridSearchEngine(session, org_id=user.org_id)
+        engine = HybridSearchEngine(session, embedder=build_embedder(), org_id=user.org_id)
         return await engine.search(
             query=q,
             meeting_id=meeting_id,

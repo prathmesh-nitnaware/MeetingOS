@@ -8,7 +8,6 @@ import argparse
 import hashlib
 import json
 import logging
-import os
 import shutil
 import tarfile
 import time
@@ -139,7 +138,11 @@ def verify_backup(backup_tarball: str) -> bool:
                 db_file = manifest_file.parent / db_meta["file"]
                 actual_hash = compute_sha256(db_file)
                 if actual_hash != db_meta["sha256"]:
-                    logger.error("Database checksum mismatch! Expected: %s, Actual: %s", db_meta["sha256"], actual_hash)
+                    logger.error(
+                        "Database checksum mismatch! Expected: %s, Actual: %s",
+                        db_meta["sha256"],
+                        actual_hash,
+                    )
                     return False
 
         logger.info("Backup archive verification PASSED successfully.")

@@ -6,7 +6,7 @@ interface SpinnerProps {
 
 export const Spinner: React.FC<SpinnerProps> = ({ message = "Loading data..." }) => {
   return (
-    <div className="loading-container" data-testid="loading-spinner">
+    <div className="loading-container" data-testid="loading-spinner" role="status" aria-live="polite">
       <div className="spinner"></div>
       <span>{message}</span>
     </div>

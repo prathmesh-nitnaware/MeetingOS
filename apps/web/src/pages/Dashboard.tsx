@@ -1,277 +1,147 @@
-import React, { useState, useEffect } from "react"
-import { useNavigate, Link } from "react-router-dom"
-import { api, DashboardMetrics, MeetingSummary } from "../services/api"
+import React, { useCallback, useEffect, useState } from "react"
+import { Link, useNavigate } from "react-router-dom"
+import { Plus, Video } from "lucide-react"
+import { useAuth } from "../auth/AuthContext"
+import { Notice } from "../components/Notice"
 import { Spinner } from "../components/Spinner"
-import { Modal } from "../components/Modal"
 import { StatusBadge } from "../components/StatusBadge"
-import { Plus, Video, Calendar, AlertCircle } from "lucide-react"
+import UploadMeetingModal from "../components/UploadMeetingModal"
+import { api, type DashboardMetrics, type MeetingSummary } from "../services/api"
+import { formatDate, formatDateTime } from "../utils/format"
+
+const KPIS: { key: keyof DashboardMetrics; label: string; accent?: string }[] = [
+  { key: "meetings_ingested", label: "Meetings ingested" },
+  { key: "decisions_tracked", label: "Decisions tracked", accent: "var(--accent-indigo)" },
+  { key: "open_actions", label: "Open action items", accent: "var(--accent-emerald)" },
+  { key: "overdue_actions", label: "Overdue actions", accent: "var(--accent-rose)" },
+  { key: "unresolved_issues", label: "Unresolved issues", accent: "var(--accent-amber)" },
+  { key: "recurring_issues", label: "Recurring issues", accent: "var(--accent-purple)" },
+  { key: "canonical_entities_tracked", label: "Entities tracked" },
+  { key: "relationships_tracked", label: "Relationships" },
+]
 
 export const Dashboard: React.FC = () => {
   const navigate = useNavigate()
+  const { hasPermission } = useAuth()
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null)
   const [recentMeetings, setRecentMeetings] = useState<MeetingSummary[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  
-  // Ingest Form States
   const [isModalOpen, setIsModalOpen] = useState(false)
-  const [title, setTitle] = useState("")
-  const [file, setFile] = useState<File | null>(null)
-  const [meetingDate, setMeetingDate] = useState("")
-  const [participants, setParticipants] = useState("")
-  const [asyncProcessing, setAsyncProcessing] = useState(false)
-  const [submitting, setSubmitting] = useState(false)
-  const [submitError, setSubmitError] = useState<string | null>(null)
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
+    setLoading(true)
+    setError(null)
     try {
-      setLoading(true)
-      setError(null)
-      const [mRes, meetingsRes] = await Promise.all([
-        api.getDashboardMetrics(),
-        api.getMeetings(5, 0)
-      ])
-      setMetrics(mRes)
-      setRecentMeetings(meetingsRes)
-    } catch (err: any) {
-      setError(err.message || "Failed to load dashboard data.")
+      const [m, meetings] = await Promise.all([api.getDashboardMetrics(), api.getMeetings(5, 0)])
+      setMetrics(m)
+      setRecentMeetings(meetings)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load dashboard data.")
     } finally {
       setLoading(false)
     }
-  }
-
-  useEffect(() => {
-    loadData()
   }, [])
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setFile(e.target.files[0])
-    }
-  }
+  useEffect(() => {
+    void loadData()
+  }, [loadData])
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!title || !file) {
-      setSubmitError("Title and Meeting File are required.")
-      return
-    }
-
-    setSubmitting(true)
-    setSubmitError(null)
-
-    try {
-      const formData = new FormData()
-      formData.append("file", file)
-      formData.append("title", title)
-      if (meetingDate) {
-        formData.append("meeting_date", meetingDate)
-      }
-      if (participants) {
-        const partsList = participants.split(",").map(p => p.trim()).filter(Boolean)
-        formData.append("participants", JSON.stringify(partsList))
-      }
-      formData.append("async_processing", String(asyncProcessing))
-
-      const res = await api.uploadMeeting(formData)
-      setIsModalOpen(false)
-      // Reset form
-      setTitle("")
-      setFile(null)
-      setMeetingDate("")
-      setParticipants("")
-      setAsyncProcessing(false)
-      
-      // Load updated data
-      loadData()
-      
-      // Redirect to new meeting detail
-      navigate(`/meetings/${res.meeting_id}`)
-    } catch (err: any) {
-      setSubmitError(err.message || "Failed to upload meeting.")
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
-  if (loading) return <Spinner message="Loading dashboard metrics..." />
+  const canUpload = hasPermission("meetings.create")
 
   return (
     <div className="dashboard-container">
       <header className="page-header">
         <div>
           <h1 className="page-title">Organizational Memory Dashboard</h1>
-          <p className="page-subtitle">Historical decision intelligence and meeting analytics summary.</p>
+          <p className="page-subtitle">Decisions, commitments and issues across your meetings.</p>
         </div>
-        <button className="btn btn-primary" onClick={() => setIsModalOpen(true)}>
-          <Plus size={16} />
-          <span>Ingest Meeting</span>
-        </button>
+        {canUpload && (
+          <button className="btn btn-primary" onClick={() => setIsModalOpen(true)}>
+            <Plus size={16} aria-hidden="true" />
+            <span>Ingest meeting</span>
+          </button>
+        )}
       </header>
 
-      {error && (
-        <div className="error-state">
-          <AlertCircle size={20} />
-          <span>{error}</span>
-        </div>
+      {loading && <Spinner message="Loading dashboard metrics..." />}
+
+      {!loading && error && (
+        <Notice tone="error">
+          {error}{" "}
+          <button type="button" className="link-evidence" onClick={() => void loadData()}>
+            Retry
+          </button>
+        </Notice>
       )}
 
-      {metrics && (
-        <section className="kpi-grid">
-          <div className="card kpi-card">
-            <span className="kpi-label">Meetings Ingested</span>
-            <span className="kpi-value">{metrics.meetings_ingested}</span>
-          </div>
-          <div className="card kpi-card" style={{ borderLeft: "3px solid var(--accent-indigo)" }}>
-            <span className="kpi-label">Decisions Tracked</span>
-            <span className="kpi-value">{metrics.decisions_tracked}</span>
-          </div>
-          <div className="card kpi-card" style={{ borderLeft: "3px solid var(--accent-emerald)" }}>
-            <span className="kpi-label">Open Action Items</span>
-            <span className="kpi-value">{metrics.open_actions}</span>
-          </div>
-          <div className="card kpi-card" style={{ borderLeft: "3px solid var(--accent-rose)" }}>
-            <span className="kpi-label">Overdue Actions</span>
-            <span className="kpi-value">{metrics.overdue_actions}</span>
-          </div>
-          <div className="card kpi-card" style={{ borderLeft: "3px solid var(--accent-amber)" }}>
-            <span className="kpi-label">Unresolved Issues</span>
-            <span className="kpi-value">{metrics.unresolved_issues}</span>
-          </div>
-          <div className="card kpi-card" style={{ borderLeft: "3px solid var(--accent-purple)" }}>
-            <span className="kpi-label">Recurring Issues</span>
-            <span className="kpi-value">{metrics.recurring_issues}</span>
-          </div>
-          <div className="card kpi-card">
-            <span className="kpi-label">Entities Tracked</span>
-            <span className="kpi-value">{metrics.canonical_entities_tracked}</span>
-          </div>
-          <div className="card kpi-card">
-            <span className="kpi-label">Relationships</span>
-            <span className="kpi-value">{metrics.relationships_tracked}</span>
-          </div>
+      {!loading && metrics && (
+        <section className="kpi-grid" aria-label="Key metrics">
+          {KPIS.map(({ key, label, accent }) => (
+            <div key={key} className="card kpi-card" style={accent ? { borderLeft: `3px solid ${accent}` } : undefined}>
+              <span className="kpi-label">{label}</span>
+              <span className="kpi-value">{metrics[key]}</span>
+            </div>
+          ))}
         </section>
       )}
 
-      <section className="card" style={{ marginTop: "24px" }}>
-        <h2 className="card-title">Recent Ingestion Activity</h2>
-        {recentMeetings.length === 0 ? (
-          <div className="empty-state">
-            <Video size={48} className="empty-state-icon" />
-            <p>No meetings have been ingested yet.</p>
-            <button className="btn btn-outline" style={{ marginTop: "16px" }} onClick={() => setIsModalOpen(true)}>
-              Upload First Meeting
-            </button>
-          </div>
-        ) : (
-          <div className="table-container">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Meeting Title</th>
-                  <th>Date</th>
-                  <th>Source Type</th>
-                  <th>Processing Status</th>
-                  <th>Segments</th>
-                  <th>Created At</th>
-                </tr>
-              </thead>
-              <tbody>
-                {recentMeetings.map((m) => (
-                  <tr key={m.meeting_id} style={{ cursor: "pointer" }} onClick={() => navigate(`/meetings/${m.meeting_id}`)}>
-                    <td style={{ fontWeight: 600, color: "var(--accent-sky)" }}>{m.title}</td>
-                    <td>
-                      <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
-                        <Calendar size={13} />
-                        {new Date(m.meeting_date).toLocaleDateString()}
-                      </span>
-                    </td>
-                    <td><code>{m.source_type}</code></td>
-                    <td>
-                      <StatusBadge status={m.processing_status} />
-                    </td>
-                    <td>{m.segment_count}</td>
-                    <td>{new Date(m.created_at).toLocaleString()}</td>
+      {!loading && !error && (
+        <section className="card" style={{ marginTop: "24px" }}>
+          <h2 className="card-title">Recent ingestion activity</h2>
+          {recentMeetings.length === 0 ? (
+            <div className="empty-state">
+              <Video size={48} className="empty-state-icon" aria-hidden="true" />
+              <p>No meetings have been ingested yet.</p>
+              {canUpload && (
+                <button className="btn btn-outline" style={{ marginTop: "16px" }} onClick={() => setIsModalOpen(true)}>
+                  Upload your first meeting
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="table-container">
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th scope="col">Meeting</th>
+                    <th scope="col">Date</th>
+                    <th scope="col">Source</th>
+                    <th scope="col">Status</th>
+                    <th scope="col">Segments</th>
+                    <th scope="col">Ingested</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
-
-      {/* Meeting upload Modal */}
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Upload and Ingest Meeting">
-        <form onSubmit={handleSubmit}>
-          {submitError && (
-            <div className="error-state" style={{ marginBottom: "16px" }}>
-              <AlertCircle size={16} />
-              <span>{submitError}</span>
+                </thead>
+                <tbody>
+                  {recentMeetings.map((m) => (
+                    <tr key={m.meeting_id}>
+                      <td>
+                        <Link to={`/meetings/${m.meeting_id}`} className="table-link">
+                          {m.title}
+                        </Link>
+                      </td>
+                      <td>{formatDate(m.meeting_date)}</td>
+                      <td><code>{m.source_type}</code></td>
+                      <td><StatusBadge status={m.processing_status} /></td>
+                      <td>{m.segment_count}</td>
+                      <td>{formatDateTime(m.created_at)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
-          <div className="form-group">
-            <label className="form-label">Meeting Title *</label>
-            <input
-              type="text"
-              className="form-input"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="e.g. Database Architecture Sync"
-              required
-            />
-          </div>
-          <div className="form-group">
-            <label className="form-label">Meeting Date (YYYY-MM-DD or ISO)</label>
-            <input
-              type="text"
-              className="form-input"
-              value={meetingDate}
-              onChange={(e) => setMeetingDate(e.target.value)}
-              placeholder="e.g. 2026-08-25"
-            />
-          </div>
-          <div className="form-group">
-            <label className="form-label">Participants (comma separated)</label>
-            <input
-              type="text"
-              className="form-input"
-              value={participants}
-              onChange={(e) => setParticipants(e.target.value)}
-              placeholder="e.g. Rahul Verma, Priya Sharma"
-            />
-          </div>
-          <div className="form-group">
-            <label className="form-label">Source File * (.wav, .mp3, .srt, .txt, .mp4)</label>
-            <input
-              type="file"
-              className="form-input"
-              onChange={handleFileChange}
-              accept=".wav,.mp3,.srt,.txt,.mp4"
-              required
-            />
-          </div>
-          <div className="form-group" style={{ flexDirection: "row", alignItems: "center", gap: "10px", marginTop: "10px" }}>
-            <input
-              type="checkbox"
-              id="asyncCheckbox"
-              checked={asyncProcessing}
-              onChange={(e) => setAsyncProcessing(e.target.checked)}
-            />
-            <label htmlFor="asyncCheckbox" className="form-label" style={{ margin: 0, cursor: "pointer" }}>
-              Process asynchronously via Celery Queue
-            </label>
-          </div>
+        </section>
+      )}
 
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: "12px", marginTop: "24px" }}>
-            <button type="button" className="btn btn-outline" onClick={() => setIsModalOpen(false)} disabled={submitting}>
-              Cancel
-            </button>
-            <button type="submit" className="btn btn-primary" disabled={submitting}>
-              {submitting ? "Uploading..." : "Start Ingestion"}
-            </button>
-          </div>
-        </form>
-      </Modal>
+      <UploadMeetingModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onUploaded={(id) => {
+          setIsModalOpen(false)
+          navigate(`/meetings/${id}`)
+        }}
+      />
     </div>
   )
 }

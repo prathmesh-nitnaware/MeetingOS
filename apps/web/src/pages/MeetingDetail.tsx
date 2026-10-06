@@ -1,27 +1,35 @@
-import React, { useState, useEffect, useRef } from "react"
-import { useParams, Link, useSearchParams } from "react-router-dom"
-import { api, MeetingDetailResponse, TranscriptSegment, ExtractedDecision, ExtractedCommitment, ExtractedIssue, ExtractedEvent, ExtractedEntity, ExtractedRelation } from "../services/api"
+import React, { useCallback, useEffect, useMemo, useState } from "react"
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom"
+import { AlertCircle, Calendar, Clock, FileText, GitCommit, Share2, Tag, TrendingUp, User, Users } from "lucide-react"
+import { useAuth } from "../auth/AuthContext"
+import { Notice } from "../components/Notice"
+import { PayloadDetails } from "../components/PayloadDetails"
 import { Spinner } from "../components/Spinner"
 import { StatusBadge } from "../components/StatusBadge"
 import {
-  Calendar,
-  Clock,
-  User,
-  Activity,
-  FileText,
-  AlertCircle,
-  TrendingUp,
-  Tag,
-  GitCommit,
-  Share2,
-  Users
-} from "lucide-react"
+  api,
+  type ExtractedCommitment,
+  type ExtractedDecision,
+  type ExtractedEntity,
+  type ExtractedEvent,
+  type ExtractedIssue,
+  type ExtractedRelation,
+  type JobStatus,
+  type MeetingDetailResponse,
+  type TranscriptSegment,
+} from "../services/api"
+import { formatDate, formatDuration, formatTimestamp, humanize, prettifySpeakerId } from "../utils/format"
+
+type Tab = "transcript" | "decisions" | "actions" | "issues" | "timeline" | "graph"
+
+const ACTIVE_STATUSES = new Set(["queued", "running"])
 
 export const MeetingDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>()
+  const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const highlightId = searchParams.get("highlight")
-  const transcriptEndRef = useRef<HTMLDivElement>(null)
+  const { hasPermission } = useAuth()
 
   const [meeting, setMeeting] = useState<MeetingDetailResponse | null>(null)
   const [transcript, setTranscript] = useState<TranscriptSegment[]>([])
@@ -32,476 +40,474 @@ export const MeetingDetail: React.FC = () => {
   const [entities, setEntities] = useState<ExtractedEntity[]>([])
   const [relations, setRelations] = useState<ExtractedRelation[]>([])
   const [topics, setTopics] = useState<string[]>([])
+  const [failedSections, setFailedSections] = useState<string[]>([])
+  const [job, setJob] = useState<JobStatus | null>(null)
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [activeTab, setActiveTab] = useState<"transcript" | "decisions" | "actions" | "issues" | "timeline" | "graph">("transcript")
+  const [activeTab, setActiveTab] = useState<Tab>("transcript")
   const [highlightedSegmentId, setHighlightedSegmentId] = useState<string | null>(null)
-  
-  // Job Triggers
-  const [extracting, setExtracting] = useState(false)
-  const [reconciling, setReconciling] = useState(false)
-  const [reconResult, setReconResult] = useState<string | null>(null)
+  const [busy, setBusy] = useState<"extract" | "reconcile" | "delete" | null>(null)
+  const [message, setMessage] = useState<{ tone: "success" | "error"; text: string } | null>(null)
 
-  const loadAllData = async (showLoadingSpinner = true) => {
-    if (!id) return
-    try {
-      if (showLoadingSpinner) setLoading(true)
+  const loadAllData = useCallback(
+    async (showSpinner = true) => {
+      if (!id) return
+      if (showSpinner) setLoading(true)
       setError(null)
-      
-      const mDetail = await api.getMeetingDetail(id)
-      setMeeting(mDetail)
+      try {
+        const detail = await api.getMeetingDetail(id)
+        setMeeting(detail)
 
-      // Fetch all sub-resources in parallel
-      const [
-        tRes,
-        dRes,
-        aRes,
-        iRes,
-        eRes,
-        entRes,
-        relRes,
-        topicsRes
-      ] = await Promise.all([
-        api.getMeetingTranscript(id).catch(() => ({ segments: [] })),
-        api.getMeetingDecisions(id).catch(() => []),
-        api.getMeetingActions(id).catch(() => []),
-        api.getMeetingIssues(id).catch(() => []),
-        api.getMeetingTimeline(id).catch(() => []),
-        api.getMeetingEntities(id).catch(() => []),
-        api.getMeetingRelations(id).catch(() => []),
-        api.getMeetingTopics(id).catch(() => [])
-      ])
-
-      setTranscript(tRes.segments)
-      setDecisions(dRes)
-      setActions(aRes)
-      setIssues(iRes)
-      setEvents(eRes)
-      setEntities(entRes)
-      setRelations(relRes)
-      setTopics(topicsRes)
-    } catch (err: any) {
-      setError(err.message || "Failed to load meeting details.")
-    } finally {
-      if (showLoadingSpinner) setLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    loadAllData()
-  }, [id])
+        const failed: string[] = []
+        const safe = async <T,>(label: string, p: Promise<T>, fallback: T): Promise<T> => {
+          try {
+            return await p
+          } catch {
+            failed.push(label)
+            return fallback
+          }
+        }
+        const [t, d, a, i, e, ent, rel, top] = await Promise.all([
+          safe("transcript", api.getMeetingTranscript(id).then((r) => r.segments), [] as TranscriptSegment[]),
+          safe("decisions", api.getMeetingDecisions(id), [] as ExtractedDecision[]),
+          safe("actions", api.getMeetingActions(id), [] as ExtractedCommitment[]),
+          safe("issues", api.getMeetingIssues(id), [] as ExtractedIssue[]),
+          safe("timeline", api.getMeetingTimeline(id), [] as ExtractedEvent[]),
+          safe("entities", api.getMeetingEntities(id), [] as ExtractedEntity[]),
+          safe("relations", api.getMeetingRelations(id), [] as ExtractedRelation[]),
+          safe("topics", api.getMeetingTopics(id), [] as string[]),
+        ])
+        setTranscript(t)
+        setDecisions(d)
+        setActions(a)
+        setIssues(i)
+        setEvents(e)
+        setEntities(ent)
+        setRelations(rel)
+        setTopics(top)
+        setFailedSections(failed)
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to load meeting details.")
+      } finally {
+        if (showSpinner) setLoading(false)
+      }
+    },
+    [id]
+  )
 
   useEffect(() => {
-    if (highlightId && transcript.length > 0) {
-      jumpToSegment(highlightId)
-    }
-  }, [highlightId, transcript])
+    void loadAllData()
+  }, [loadAllData])
 
-  // Scroll to and highlight segment in transcript
-  const jumpToSegment = (segmentId?: string) => {
+  // While a meeting is being processed, poll its job and refresh when it finishes
+  const processing = meeting ? ACTIVE_STATUSES.has(meeting.processing_status) : false
+  useEffect(() => {
+    if (!meeting || !processing) return
+    const timer = window.setInterval(async () => {
+      try {
+        if (meeting.latest_job_id) setJob(await api.getJob(meeting.latest_job_id))
+        const detail = await api.getMeetingDetail(meeting.meeting_id)
+        if (!ACTIVE_STATUSES.has(detail.processing_status)) {
+          setJob(null)
+          await loadAllData(false)
+        }
+      } catch {
+        /* transient polling error: try again on the next tick */
+      }
+    }, 3000)
+    return () => window.clearInterval(timer)
+  }, [meeting, processing, loadAllData])
+
+  const segmentIds = useMemo(() => new Set(transcript.map((s) => s.segment_id)), [transcript])
+
+  const speakerNames = useMemo(() => {
+    const map = new Map<string, string>()
+    meeting?.speakers.forEach((s) => {
+      if (s.name) map.set(s.speaker_id, s.name)
+    })
+    return map
+  }, [meeting])
+  const speakerLabel = (speakerId?: string | null) =>
+    (speakerId && speakerNames.get(speakerId)) || prettifySpeakerId(speakerId)
+
+  const entityNames = useMemo(() => new Map(entities.map((e) => [e.entity_id, e.name])), [entities])
+
+  const jumpToSegment = useCallback((segmentId?: string | null) => {
     if (!segmentId) return
     setHighlightedSegmentId(segmentId)
     setActiveTab("transcript")
-    setTimeout(() => {
-      const element = document.getElementById(`seg-${segmentId}`)
-      if (element) {
-        element.scrollIntoView({ behavior: "smooth", block: "center" })
-      }
+    window.setTimeout(() => {
+      document.getElementById(`seg-${segmentId}`)?.scrollIntoView({ behavior: "smooth", block: "center" })
     }, 150)
-  }
+  }, [])
 
-  const triggerExtraction = async () => {
+  useEffect(() => {
+    if (highlightId && transcript.length > 0) jumpToSegment(highlightId)
+  }, [highlightId, transcript, jumpToSegment])
+
+  const runAction = async (kind: "extract" | "reconcile") => {
     if (!id) return
+    setBusy(kind)
+    setMessage(null)
     try {
-      setExtracting(true)
-      await api.triggerNLPExtraction(id)
-      await loadAllData(false) // Reload facts silently
-    } catch (err: any) {
-      alert(`Extraction failed: ${err.message}`)
+      if (kind === "extract") {
+        const res = await api.triggerNLPExtraction(id)
+        setMessage({ tone: "success", text: `Re-extracted ${res.decisions_count} decisions and ${res.entities_count} entities.` })
+      } else {
+        const res = await api.reconcileLifecycle(id)
+        setMessage({
+          tone: "success",
+          text: `Compared with earlier meetings: ${res.decision_changes_detected} decision changes, ${res.deadline_changes_detected} deadline changes, ${res.recurring_issues_detected} recurring issues.`,
+        })
+      }
+      await loadAllData(false)
+    } catch (err) {
+      setMessage({ tone: "error", text: err instanceof Error ? err.message : "The action failed." })
     } finally {
-      setExtracting(false)
+      setBusy(null)
     }
   }
 
-  const triggerReconciliation = async () => {
-    if (!id) return
+  const deleteMeeting = async () => {
+    if (!id || !meeting) return
+    if (!window.confirm(`Delete "${meeting.title}"? It will disappear from search, answers and the dashboard.`)) return
+    setBusy("delete")
     try {
-      setReconciling(true)
-      setReconResult(null)
-      const res = await api.reconcileLifecycle(id)
-      setReconResult(
-        `Reconciliation complete: Detected ${res.decision_changes_detected} decision changes, ${res.deadline_changes_detected} deadline changes, and ${res.recurring_issues_detected} recurring issues.`
-      )
-      await loadAllData(false) // Refresh events
-    } catch (err: any) {
-      alert(`Reconciliation failed: ${err.message}`)
-    } finally {
-      setReconciling(false)
+      await api.deleteMeeting(id)
+      navigate("/meetings")
+    } catch (err) {
+      setMessage({ tone: "error", text: err instanceof Error ? err.message : "Delete failed." })
+      setBusy(null)
     }
   }
 
-  const formatDuration = (seconds?: number) => {
-    if (!seconds) return "N/A"
-    const m = Math.floor(seconds / 60)
-    const s = Math.round(seconds % 60)
-    return `${m}m ${s}s`
-  }
+  const EvidenceLink: React.FC<{ segmentId?: string | null; label?: string }> = ({ segmentId, label }) =>
+    segmentId && segmentIds.has(segmentId) ? (
+      <button type="button" className="link-evidence" onClick={() => jumpToSegment(segmentId)}>
+        {label ?? "Jump to evidence"} &rarr;
+      </button>
+    ) : null
 
   if (loading) return <Spinner message="Loading meeting details & analysis..." />
   if (error || !meeting) {
     return (
-      <div className="error-state">
-        <AlertCircle size={20} />
-        <span>{error || "Meeting not found."}</span>
+      <div>
+        <Link to="/meetings" className="link-evidence back-link">&larr; Back to meetings</Link>
+        <Notice tone="error">{error || "Meeting not found."}</Notice>
       </div>
     )
   }
 
+  const tabs: { key: Tab; label: string }[] = [
+    { key: "transcript", label: "Transcript" },
+    { key: "decisions", label: `Decisions (${decisions.length})` },
+    { key: "actions", label: `Commitments & actions (${actions.length})` },
+    { key: "issues", label: `Issues (${issues.length})` },
+    { key: "timeline", label: `Meeting timeline (${events.length})` },
+    { key: "graph", label: "Entities & relations" },
+  ]
+
   return (
     <div className="meeting-detail-page">
-      <div style={{ marginBottom: "16px" }}>
-        <Link to="/meetings" className="link-evidence" style={{ fontSize: "13px" }}>
-          &larr; Back to Directory
-        </Link>
-      </div>
+      <Link to="/meetings" className="link-evidence back-link">&larr; Back to meetings</Link>
 
-      <header className="page-header" style={{ alignItems: "flex-start", gap: "24px" }}>
-        <div style={{ flex: 1 }}>
-          <h1 className="page-title" style={{ margin: 0 }}>{meeting.title}</h1>
-          <div className="page-subtitle" style={{ display: "flex", flexWrap: "wrap", gap: "16px", marginTop: "8px" }}>
-            <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
-              <Calendar size={14} />
-              {new Date(meeting.meeting_date).toLocaleDateString()}
-            </span>
-            <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
-              <Clock size={14} />
-              {formatDuration(meeting.duration_seconds)}
-            </span>
-            <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
-              <Users size={14} />
-              {meeting.participants.length} Participants
-            </span>
-            <span>
-              Source: <code>{meeting.source_type}</code>
-            </span>
+      <header className="page-header detail-header">
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <h1 className="page-title">{meeting.title}</h1>
+          <div className="page-subtitle meta-row">
+            <span><Calendar size={14} aria-hidden="true" /> {formatDate(meeting.meeting_date)}</span>
+            <span><Clock size={14} aria-hidden="true" /> {formatDuration(meeting.duration_seconds)}</span>
+            <span><Users size={14} aria-hidden="true" /> {meeting.participants.length} participants · {meeting.speakers_count} speakers</span>
+            <span>Source: <code>{meeting.metadata.source_filename || meeting.source_type}</code></span>
           </div>
         </div>
 
-        <div style={{ display: "flex", flexWrap: "wrap", gap: "10px", alignItems: "center" }}>
+        <div className="header-actions">
           <StatusBadge status={meeting.processing_status} />
-          
-          <button
-            className="btn btn-outline"
-            onClick={triggerExtraction}
-            disabled={extracting || transcript.length === 0}
-          >
-            {extracting ? "Running NLP..." : "Run NLP Facts"}
-          </button>
-          
-          <button
-            className="btn btn-primary"
-            onClick={triggerReconciliation}
-            disabled={reconciling}
-          >
-            {reconciling ? "Reconciling..." : "Reconcile History"}
-          </button>
+          {hasPermission("meetings.update") && (
+            <button className="btn btn-outline" onClick={() => void runAction("extract")} disabled={busy !== null || transcript.length === 0}>
+              {busy === "extract" ? "Running NLP..." : "Re-run NLP facts"}
+            </button>
+          )}
+          {hasPermission("meetings.update") && (
+            <button className="btn btn-primary" onClick={() => void runAction("reconcile")} disabled={busy !== null || processing}>
+              {busy === "reconcile" ? "Reconciling..." : "Reconcile history"}
+            </button>
+          )}
+          {hasPermission("meetings.delete") && (
+            <button className="btn btn-danger" onClick={() => void deleteMeeting()} disabled={busy !== null}>
+              Delete
+            </button>
+          )}
         </div>
       </header>
 
-      {reconResult && (
-        <div className="error-state" style={{ backgroundColor: "rgba(16, 185, 129, 0.08)", border: "1px solid rgba(16, 185, 129, 0.2)", color: "#a7f3d0", marginBottom: "24px" }}>
-          <Activity size={20} />
-          <span>{reconResult}</span>
-        </div>
+      {processing && (
+        <Notice tone="info">
+          This meeting is being processed{job ? ` (${humanize(job.stage)}, ${Math.round(job.progress * 100)}%)` : ""}. This page refreshes automatically.
+        </Notice>
+      )}
+      {meeting.processing_status === "failed" && (
+        <Notice tone="error">Processing failed: {meeting.latest_job_error || "unknown error"}</Notice>
+      )}
+      {failedSections.length > 0 && (
+        <Notice tone="error">Some sections could not be loaded: {failedSections.join(", ")}.</Notice>
+      )}
+      {message && (
+        <Notice tone={message.tone} onDismiss={() => setMessage(null)}>
+          {message.text}
+        </Notice>
       )}
 
       {topics.length > 0 && (
-        <div className="card" style={{ padding: "16px", marginBottom: "24px" }}>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", alignItems: "center" }}>
-            <span style={{ fontSize: "12px", fontWeight: 700, textTransform: "uppercase", color: "var(--text-muted)", marginRight: "8px" }}>Topics:</span>
-            {topics.map((topic, i) => (
-              <span key={i} className="badge" style={{ backgroundColor: "rgba(255, 255, 255, 0.05)", color: "var(--text-primary)" }}>
-                <Tag size={10} style={{ marginRight: "4px" }} />
-                {topic}
-              </span>
-            ))}
-          </div>
+        <div className="card topics-card">
+          <span className="kpi-label">Topics</span>
+          {topics.map((topic) => (
+            <span key={topic} className="badge topic-badge">
+              <Tag size={10} aria-hidden="true" /> {topic}
+            </span>
+          ))}
         </div>
       )}
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: "24px" }}>
-        <div className="tabs-header">
-          <button className={`tab-btn ${activeTab === "transcript" ? "active" : ""}`} onClick={() => setActiveTab("transcript")}>
-            Transcript & Speech
+      <div className="tabs-header" role="tablist" aria-label="Meeting sections">
+        {tabs.map((t) => (
+          <button
+            key={t.key}
+            role="tab"
+            aria-selected={activeTab === t.key}
+            className={`tab-btn ${activeTab === t.key ? "active" : ""}`}
+            onClick={() => setActiveTab(t.key)}
+          >
+            {t.label}
           </button>
-          <button className={`tab-btn ${activeTab === "decisions" ? "active" : ""}`} onClick={() => setActiveTab("decisions")}>
-            Decisions ({decisions.length})
-          </button>
-          <button className={`tab-btn ${activeTab === "actions" ? "active" : ""}`} onClick={() => setActiveTab("actions")}>
-            Commitments & Actions ({actions.length})
-          </button>
-          <button className={`tab-btn ${activeTab === "issues" ? "active" : ""}`} onClick={() => setActiveTab("issues")}>
-            Issues ({issues.length})
-          </button>
-          <button className={`tab-btn ${activeTab === "timeline" ? "active" : ""}`} onClick={() => setActiveTab("timeline")}>
-            Meeting Timeline ({events.length})
-          </button>
-          <button className={`tab-btn ${activeTab === "graph" ? "active" : ""}`} onClick={() => setActiveTab("graph")}>
-            Entities & Relations
-          </button>
-        </div>
+        ))}
+      </div>
 
-        <div className="tab-content">
-          {activeTab === "transcript" && (
-            <div className="card" style={{ padding: "20px" }}>
-              {transcript.length === 0 ? (
-                <div className="empty-state">
-                  <FileText size={48} className="empty-state-icon" />
-                  <p>No transcript segments available for this meeting. Check ingestion status or verify file.</p>
+      <div className="tab-content" role="tabpanel">
+        {activeTab === "transcript" && (
+          <div className="card">
+            {transcript.length === 0 ? (
+              <div className="empty-state">
+                <FileText size={48} className="empty-state-icon" aria-hidden="true" />
+                <p>{processing ? "The transcript will appear when processing finishes." : "No transcript segments for this meeting."}</p>
+              </div>
+            ) : (
+              <div className="transcript-pane">
+                {transcript.map((seg) => (
+                  <div
+                    key={seg.segment_id}
+                    id={`seg-${seg.segment_id}`}
+                    className={`utterance-item ${highlightedSegmentId === seg.segment_id ? "highlighted" : ""}`}
+                  >
+                    <div className="utterance-meta">
+                      <span className="utterance-speaker">
+                        <User size={12} aria-hidden="true" /> {speakerLabel(seg.speaker_id)}
+                      </span>
+                      <span className="utterance-time">
+                        {formatTimestamp(seg.start_time)} – {formatTimestamp(seg.end_time)}
+                      </span>
+                    </div>
+                    <p className="utterance-text">{seg.text}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === "decisions" && (
+          <div className="fact-grid">
+            {decisions.length === 0 ? (
+              <div className="card empty-state">
+                <GitCommit size={48} className="empty-state-icon" aria-hidden="true" />
+                <p>No decisions extracted from this meeting.</p>
+              </div>
+            ) : (
+              decisions.map((dec) => (
+                <div key={dec.decision_id} className="fact-item accent-indigo">
+                  <div className="fact-header">
+                    <h4 className="fact-subject">{dec.subject}</h4>
+                    <StatusBadge status={dec.status} />
+                  </div>
+                  <div className="fact-footer">
+                    <Link to={`/temporal?decision=${dec.decision_id}`} className="link-evidence">
+                      View history
+                    </Link>
+                    <EvidenceLink segmentId={dec.evidence_segment_id} />
+                  </div>
                 </div>
-              ) : (
-                <div className="transcript-pane">
-                  {transcript.map((seg) => (
-                    <div
-                      key={seg.segment_id}
-                      id={`seg-${seg.segment_id}`}
-                      className={`utterance-item ${highlightedSegmentId === seg.segment_id ? "highlighted" : ""}`}
-                    >
-                      <div className="utterance-meta">
-                        <span className="utterance-speaker">
-                          <User size={12} style={{ display: "inline", marginRight: "4px", verticalAlign: "middle" }} />
-                          {seg.speaker_id}
-                        </span>
-                        <span className="utterance-time">
-                          {Math.floor(seg.start_time / 60)}:
-                          {String(Math.floor(seg.start_time % 60)).padStart(2, "0")} -{" "}
-                          {Math.floor(seg.end_time / 60)}:
-                          {String(Math.floor(seg.end_time % 60)).padStart(2, "0")}
-                        </span>
+              ))
+            )}
+          </div>
+        )}
+
+        {activeTab === "actions" && (
+          <div className="fact-grid">
+            {actions.length === 0 ? (
+              <div className="card empty-state">
+                <TrendingUp size={48} className="empty-state-icon" aria-hidden="true" />
+                <p>No action items or commitments extracted from this meeting.</p>
+              </div>
+            ) : (
+              actions.map((act) => (
+                <div key={act.commitment_id} className="fact-item accent-emerald">
+                  <div className="fact-header">
+                    <h4 className="fact-subject">{act.description}</h4>
+                    <StatusBadge status={act.status} />
+                  </div>
+                  <div className="fact-body fact-meta">
+                    <span><strong>Owner:</strong> {speakerLabel(act.owner_id)}</span>
+                    {act.current_deadline && (
+                      <span>
+                        <strong>Deadline:</strong> {formatDate(act.current_deadline)}
+                        {act.original_deadline && act.original_deadline !== act.current_deadline && (
+                          <> (originally {formatDate(act.original_deadline)})</>
+                        )}
+                      </span>
+                    )}
+                  </div>
+                  <div className="fact-footer">
+                    <Link to={`/temporal?commitment=${act.commitment_id}`} className="link-evidence">
+                      View history
+                    </Link>
+                    <EvidenceLink segmentId={act.evidence_segment_id} />
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        )}
+
+        {activeTab === "issues" && (
+          <div className="fact-grid">
+            {issues.length === 0 ? (
+              <div className="card empty-state">
+                <AlertCircle size={48} className="empty-state-icon" aria-hidden="true" />
+                <p>No issues or blockers extracted from this meeting.</p>
+              </div>
+            ) : (
+              issues.map((iss) => (
+                <div key={iss.issue_id} className="fact-item accent-amber">
+                  <div className="fact-header">
+                    <h4 className="fact-subject">{iss.description}</h4>
+                    <StatusBadge status={iss.status} />
+                  </div>
+                  {iss.owner_id && (
+                    <p className="fact-body"><strong>Raised by:</strong> {speakerLabel(iss.owner_id)}</p>
+                  )}
+                  <div className="fact-footer">
+                    <Link to={`/temporal?issue=${iss.issue_id}`} className="link-evidence">
+                      View history
+                    </Link>
+                    <EvidenceLink segmentId={iss.evidence_segment_id} />
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        )}
+
+        {activeTab === "timeline" && (
+          <div className="card">
+            {events.length === 0 ? (
+              <div className="empty-state">
+                <GitCommit size={48} className="empty-state-icon" aria-hidden="true" />
+                <p>No lifecycle events for this meeting.</p>
+              </div>
+            ) : (
+              <div className="timeline-stream">
+                {events.map((evt) => (
+                  <div key={evt.event_id} className="timeline-event">
+                    <div className="timeline-node"></div>
+                    <div className="card timeline-card">
+                      <div className="timeline-meta">
+                        <span className="timeline-type">{humanize(evt.event_type)}</span>
+                        <span>{formatDate(evt.occurred_at)}</span>
                       </div>
-                      <p className="utterance-text">{seg.text}</p>
-                    </div>
-                  ))}
-                  <div ref={transcriptEndRef} />
-                </div>
-              )}
-            </div>
-          )}
-
-          {activeTab === "decisions" && (
-            <div className="fact-grid">
-              {decisions.length === 0 ? (
-                <div className="card empty-state">
-                  <GitCommit size={48} className="empty-state-icon" />
-                  <p>No decisions extracted from this meeting yet.</p>
-                </div>
-              ) : (
-                decisions.map((dec) => (
-                  <div key={dec.decision_id} className="fact-item" style={{ borderLeft: "3px solid var(--accent-indigo)" }}>
-                    <div className="fact-header">
-                      <h4 className="fact-subject">{dec.subject}</h4>
-                      <span className="badge" style={{ backgroundColor: "rgba(99,102,241,0.15)", color: "var(--accent-indigo)" }}>
-                        {dec.status}
-                      </span>
-                    </div>
-                    {dec.rationale && <p className="fact-body"><span style={{ fontWeight: 600 }}>Rationale:</span> {dec.rationale}</p>}
-                    <div className="fact-footer">
-                      <span>ID: <code>{dec.decision_id}</code></span>
-                      {dec.evidence_segment_id && (
-                        <button className="link-evidence" onClick={() => jumpToSegment(dec.evidence_segment_id)}>
-                          Jump to Evidence &rarr;
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          )}
-
-          {activeTab === "actions" && (
-            <div className="fact-grid">
-              {actions.length === 0 ? (
-                <div className="card empty-state">
-                  <TrendingUp size={48} className="empty-state-icon" />
-                  <p>No action items or commitments extracted from this meeting yet.</p>
-                </div>
-              ) : (
-                actions.map((act) => (
-                  <div key={act.commitment_id} className="fact-item" style={{ borderLeft: "3px solid var(--accent-emerald)" }}>
-                    <div className="fact-header">
-                      <h4 className="fact-subject">{act.description}</h4>
-                      <span className="badge" style={{ backgroundColor: "rgba(16,185,129,0.15)", color: "var(--accent-emerald)" }}>
-                        {act.status}
-                      </span>
-                    </div>
-                    <div className="fact-body" style={{ display: "flex", gap: "24px" }}>
-                      <p><span style={{ fontWeight: 600 }}>Owner:</span> <code>{act.owner_id}</code></p>
-                      {act.current_deadline && (
-                        <p>
-                          <span style={{ fontWeight: 600 }}>Deadline:</span>{" "}
-                          {new Date(act.current_deadline).toLocaleDateString()}
-                        </p>
-                      )}
-                    </div>
-                    <div className="fact-footer">
-                      <span>ID: <code>{act.commitment_id}</code></span>
-                      {act.evidence_segment_id && (
-                        <button className="link-evidence" onClick={() => jumpToSegment(act.evidence_segment_id)}>
-                          Jump to Evidence &rarr;
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          )}
-
-          {activeTab === "issues" && (
-            <div className="fact-grid">
-              {issues.length === 0 ? (
-                <div className="card empty-state">
-                  <AlertCircle size={48} className="empty-state-icon" />
-                  <p>No organizational issues or blockers extracted from this meeting yet.</p>
-                </div>
-              ) : (
-                issues.map((iss) => (
-                  <div key={iss.issue_id} className="fact-item" style={{ borderLeft: "3px solid var(--accent-amber)" }}>
-                    <div className="fact-header">
-                      <h4 className="fact-subject">{iss.description}</h4>
-                      <span className="badge" style={{ backgroundColor: "rgba(245,158,11,0.15)", color: "var(--accent-amber)" }}>
-                        {iss.status}
-                      </span>
-                    </div>
-                    {iss.owner_id && <p className="fact-body"><span style={{ fontWeight: 600 }}>Assigned To:</span> <code>{iss.owner_id}</code></p>}
-                    <div className="fact-footer">
-                      <span>ID: <code>{iss.issue_id}</code></span>
-                      {iss.evidence_segment_id && (
-                        <button className="link-evidence" onClick={() => jumpToSegment(iss.evidence_segment_id)}>
-                          Jump to Evidence &rarr;
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          )}
-
-          {activeTab === "timeline" && (
-            <div className="card" style={{ padding: "24px" }}>
-              {events.length === 0 ? (
-                <div className="empty-state">
-                  <GitCommit size={48} className="empty-state-icon" />
-                  <p>No chronological timeline events associated with this meeting.</p>
-                </div>
-              ) : (
-                <div className="timeline-stream">
-                  {events.map((evt) => (
-                    <div key={evt.event_id} className={`timeline-event ${evt.event_type.toLowerCase()}`}>
-                      <div className="timeline-node"></div>
-                      <div className="card timeline-card">
-                        <div className="timeline-meta">
-                          <span className="timeline-type">{evt.event_type}</span>
-                          <span>{new Date(evt.occurred_at).toLocaleTimeString()}</span>
-                        </div>
-                        <p style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-primary)" }}>
-                          Subject Entity ID: <code>{evt.subject_entity_id}</code>
-                        </p>
-                        {evt.payload_json && (
-                          <pre style={{ fontFamily: "var(--font-mono)", fontSize: "11px", backgroundColor: "rgba(0,0,0,0.2)", padding: "10px", borderRadius: "4px", marginTop: "8px", overflowX: "auto" }}>
-                            {JSON.stringify(evt.payload_json, null, 2)}
-                          </pre>
+                      <PayloadDetails payload={evt.payload} />
+                      <div className="fact-footer">
+                        {evt.subject_entity_id && entityNames.has(evt.subject_entity_id) && (
+                          <span className="muted">About {entityNames.get(evt.subject_entity_id)}</span>
                         )}
-                        {evt.evidence_segment_id && (
-                          <div style={{ marginTop: "12px", textAlign: "right" }}>
-                            <button className="link-evidence" style={{ fontSize: "12px" }} onClick={() => jumpToSegment(evt.evidence_segment_id)}>
-                              View Evidence Segment &rarr;
-                            </button>
-                          </div>
-                        )}
+                        <EvidenceLink segmentId={evt.evidence_segment_id} label="View evidence" />
                       </div>
                     </div>
-                  ))}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === "graph" && (
+          <div className="grid-2">
+            <div className="card">
+              <h3 className="card-title">Extracted entities</h3>
+              {entities.length === 0 ? (
+                <div className="empty-state compact">
+                  <Users size={32} className="empty-state-icon" aria-hidden="true" />
+                  <p>No entities extracted from this meeting.</p>
+                </div>
+              ) : (
+                <div className="table-container">
+                  <table className="table">
+                    <thead>
+                      <tr>
+                        <th scope="col">Name</th>
+                        <th scope="col">Type</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {entities.map((ent) => (
+                        <tr key={ent.entity_id}>
+                          <td>
+                            <Link to={`/entities?focus=${encodeURIComponent(ent.entity_id)}`} className="table-link">
+                              {ent.name}
+                            </Link>
+                          </td>
+                          <td><code>{ent.entity_type}</code></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               )}
             </div>
-          )}
 
-          {activeTab === "graph" && (
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "24px" }}>
-              <div className="card">
-                <h3 className="card-title">Extracted Entities</h3>
-                {entities.length === 0 ? (
-                  <div className="empty-state" style={{ padding: "30px 0" }}>
-                    <Users size={32} className="empty-state-icon" />
-                    <p>No entities extracted from this meeting.</p>
-                  </div>
-                ) : (
-                  <div className="table-container">
-                    <table className="table">
-                      <thead>
-                        <tr>
-                          <th>Canonical Name</th>
-                          <th>Type</th>
+            <div className="card">
+              <h3 className="card-title">Relationships</h3>
+              {relations.length === 0 ? (
+                <div className="empty-state compact">
+                  <Share2 size={32} className="empty-state-icon" aria-hidden="true" />
+                  <p>No relationships extracted from this meeting.</p>
+                </div>
+              ) : (
+                <div className="table-container">
+                  <table className="table">
+                    <thead>
+                      <tr>
+                        <th scope="col">From</th>
+                        <th scope="col">Relationship</th>
+                        <th scope="col">To</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {relations.map((rel) => (
+                        <tr key={rel.relation_id}>
+                          <td>{entityNames.get(rel.source_entity_id) ?? <code>{rel.source_entity_id}</code>}</td>
+                          <td><span className="badge badge-running">{humanize(rel.relationship_type)}</span></td>
+                          <td>{entityNames.get(rel.target_entity_id) ?? <code>{rel.target_entity_id}</code>}</td>
                         </tr>
-                      </thead>
-                      <tbody>
-                        {entities.map((ent) => (
-                          <tr key={ent.entity_id}>
-                            <td>
-                              <Link to={`/entities`} className="link-evidence" style={{ fontWeight: 600 }}>
-                                {ent.name}
-                              </Link>
-                            </td>
-                            <td><code>{ent.entity_type}</code></td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
-
-              <div className="card">
-                <h3 className="card-title">Fact Relationships</h3>
-                {relations.length === 0 ? (
-                  <div className="empty-state" style={{ padding: "30px 0" }}>
-                    <Share2 size={32} className="empty-state-icon" />
-                    <p>No relational graph edges extracted from this meeting.</p>
-                  </div>
-                ) : (
-                  <div className="table-container">
-                    <table className="table">
-                      <thead>
-                        <tr>
-                          <th>Source</th>
-                          <th>Relationship</th>
-                          <th>Target</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {relations.map((rel) => (
-                          <tr key={rel.relation_id}>
-                            <td><code>{rel.source_entity_id}</code></td>
-                            <td>
-                              <span className="badge" style={{ backgroundColor: "rgba(245,158,11,0.1)", color: "var(--accent-amber)" }}>
-                                {rel.relationship_type}
-                              </span>
-                            </td>
-                            <td><code>{rel.target_entity_id}</code></td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </div>
   )

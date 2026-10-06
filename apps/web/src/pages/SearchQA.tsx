@@ -1,562 +1,412 @@
-import React, { useState } from "react"
-import { useNavigate, useSearchParams } from "react-router-dom"
-import { api, QueryResponse, SearchResponse, QueryPlan, AgenticQueryResponse } from "../services/api"
+import React, { useId, useState } from "react"
+import { Link } from "react-router-dom"
+import { AlertCircle, ArrowRight, Cpu, HelpCircle, MessageSquare, Search, TrendingUp } from "lucide-react"
+import { Notice } from "../components/Notice"
 import { Spinner } from "../components/Spinner"
 import {
-  Search,
-  MessageSquare,
-  Filter,
-  Activity,
-  AlertCircle,
-  HelpCircle,
-  Calendar,
-  User,
-  ArrowRight,
-  TrendingUp,
-  Cpu
-} from "lucide-react"
+  api,
+  type AgenticQueryResponse,
+  type QueryPlan,
+  type QueryResponse,
+  type SearchResponse,
+} from "../services/api"
+import { endOfDayIso, formatDate, formatScore, formatSpan, humanize, startOfDayIso } from "../utils/format"
+
+type Mode = "qa" | "agentic" | "search"
+
+interface ModeState<T> {
+  loading: boolean
+  error: string | null
+  result: T | null
+}
+
+const initial = <T,>(): ModeState<T> => ({ loading: false, error: null, result: null })
+
+async function runMode<T>(set: React.Dispatch<React.SetStateAction<ModeState<T>>>, call: () => Promise<T>) {
+  set((s) => ({ ...s, loading: true, error: null }))
+  try {
+    const result = await call()
+    set({ loading: false, error: null, result })
+  } catch (err) {
+    set((s) => ({ ...s, loading: false, error: err instanceof Error ? err.message : "Request failed." }))
+  }
+}
+
+const Confidence: React.FC<{ value: number }> = ({ value }) => (
+  <div className="confidence">
+    <span className="form-label">Confidence</span>
+    <div className="confidence-bar-bg" role="meter" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(value * 100)}>
+      <div className="confidence-bar" style={{ width: `${Math.round(value * 100)}%` }}></div>
+    </div>
+    <strong>{Math.round(value * 100)}%</strong>
+  </div>
+)
+
+const SourceLink: React.FC<{ meetingId: string; segmentId?: string | null; label?: string }> = ({ meetingId, segmentId, label }) => (
+  <Link
+    to={segmentId ? `/meetings/${meetingId}?highlight=${encodeURIComponent(segmentId)}` : `/meetings/${meetingId}`}
+    className="link-evidence"
+  >
+    {label ?? "Open source"} <ArrowRight size={12} aria-hidden="true" />
+  </Link>
+)
 
 export const SearchQA: React.FC = () => {
-  const navigate = useNavigate()
-  const [activeMode, setActiveMode] = useState<"qa" | "agentic" | "search">("qa")
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const ids = useId()
+  const [mode, setMode] = useState<Mode>("qa")
 
-  // Grounded QA States
+  // Grounded Q&A
   const [question, setQuestion] = useState("")
-  const [qaResponse, setQaResponse] = useState<QueryResponse | null>(null)
-  
-  // Agentic QA States
-  const [agenticQuestion, setAgenticQuestion] = useState("")
-  const [agenticResponse, setAgenticResponse] = useState<AgenticQueryResponse | null>(null)
-  
-  // Advanced Query Plan Override States
+  const [qa, setQa] = useState<ModeState<QueryResponse>>(initial)
   const [showOverride, setShowOverride] = useState(false)
   const [overridePerson, setOverridePerson] = useState("")
   const [overrideTopic, setOverrideTopic] = useState("")
   const [overrideType, setOverrideType] = useState("")
   const [overrideEntities, setOverrideEntities] = useState("")
-  const [overrideIntent, setOverrideIntent] = useState("qa")
 
-  // Hybrid Search States
+  // Agentic
+  const [agenticQuestion, setAgenticQuestion] = useState("")
+  const [agentic, setAgentic] = useState<ModeState<AgenticQueryResponse>>(initial)
+
+  // Hybrid search
   const [searchQuery, setSearchQuery] = useState("")
   const [searchType, setSearchType] = useState("")
   const [searchPerson, setSearchPerson] = useState("")
   const [searchTopic, setSearchTopic] = useState("")
   const [startDate, setStartDate] = useState("")
   const [endDate, setEndDate] = useState("")
-  const [searchResults, setSearchResults] = useState<SearchResponse | null>(null)
+  const [search, setSearch] = useState<ModeState<SearchResponse>>(initial)
 
-  const handleAgentic = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!agenticQuestion.trim()) return
-
-    setLoading(true)
-    setError(null)
-    setAgenticResponse(null)
-
-    try {
-      const res = await api.queryAgentic(agenticQuestion)
-      setAgenticResponse(res)
-    } catch (err: any) {
-      setError(err.message || "Failed to execute agentic query.")
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleQA = async (e: React.FormEvent) => {
+  const handleQA = (e: React.FormEvent) => {
     e.preventDefault()
     if (!question.trim()) return
-
-    setLoading(true)
-    setError(null)
-    setQaResponse(null)
-
-    try {
-      let planOverride: QueryPlan | undefined = undefined
-      if (showOverride) {
-        planOverride = {
+    const plan: QueryPlan | undefined = showOverride
+      ? {
           person: overridePerson || undefined,
           topic: overrideTopic || undefined,
           type: overrideType || undefined,
-          entities: overrideEntities ? overrideEntities.split(",").map(e => e.trim()).filter(Boolean) : [],
-          intent: overrideIntent,
+          entities: overrideEntities.split(",").map((x) => x.trim()).filter(Boolean),
+          intent: "qa",
         }
-      }
-
-      const res = await api.queryRAG(question, planOverride)
-      setQaResponse(res)
-    } catch (err: any) {
-      setError(err.message || "Failed to retrieve grounded QA answer.")
-    } finally {
-      setLoading(false)
-    }
+      : undefined
+    void runMode(setQa, () => api.queryRAG(question.trim(), plan))
   }
 
-  const handleSearch = async (e: React.FormEvent) => {
+  const handleAgentic = (e: React.FormEvent) => {
     e.preventDefault()
-    setLoading(true)
-    setError(null)
-    setSearchResults(null)
+    if (!agenticQuestion.trim()) return
+    void runMode(setAgentic, () => api.queryAgentic(agenticQuestion.trim()))
+  }
 
-    try {
-      const filters = {
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault()
+    void runMode(setSearch, () =>
+      api.search({
         q: searchQuery || undefined,
         type: searchType || undefined,
         person: searchPerson || undefined,
         topic: searchTopic || undefined,
-        start_date: startDate ? new Date(startDate).toISOString() : undefined,
-        end_date: endDate ? new Date(endDate).toISOString() : undefined,
-      }
-      const res = await api.search(filters)
-      setSearchResults(res)
-    } catch (err: any) {
-      setError(err.message || "Search query failed.")
-    } finally {
-      setLoading(false)
-    }
+        start_date: startOfDayIso(startDate),
+        end_date: endOfDayIso(endDate),
+      })
+    )
   }
+
+  const modes: { key: Mode; label: string; icon: React.ReactNode }[] = [
+    { key: "qa", label: "Grounded Q&A", icon: <MessageSquare size={14} aria-hidden="true" /> },
+    { key: "agentic", label: "Agentic reasoning", icon: <Cpu size={14} aria-hidden="true" /> },
+    { key: "search", label: "Hybrid search", icon: <Search size={14} aria-hidden="true" /> },
+  ]
 
   return (
     <div className="search-qa-page">
       <header className="page-header">
         <div>
-          <h1 className="page-title">Search & Decisions QA</h1>
-          <p className="page-subtitle">Ask questions across meetings or run multi-channel hybrid searches.</p>
+          <h1 className="page-title">Search & Decisions Q&A</h1>
+          <p className="page-subtitle">Ask questions across meetings or search the organisation's memory.</p>
         </div>
-        <div style={{ display: "flex", gap: "8px", background: "var(--bg-glass)", border: "1px solid var(--border-light)", borderRadius: "8px", padding: "4px" }}>
-          <button
-            className={`btn ${activeMode === "qa" ? "btn-primary" : "btn-outline"}`}
-            style={{ padding: "8px 16px" }}
-            onClick={() => { setActiveMode("qa"); setError(null); }}
-          >
-            <MessageSquare size={14} />
-            <span>Grounded QA</span>
-          </button>
-          <button
-            className={`btn ${activeMode === "agentic" ? "btn-primary" : "btn-outline"}`}
-            style={{ padding: "8px 16px" }}
-            onClick={() => { setActiveMode("agentic"); setError(null); }}
-          >
-            <Cpu size={14} />
-            <span>Agentic Reasoning</span>
-          </button>
-          <button
-            className={`btn ${activeMode === "search" ? "btn-primary" : "btn-outline"}`}
-            style={{ padding: "8px 16px" }}
-            onClick={() => { setActiveMode("search"); setError(null); }}
-          >
-            <Search size={14} />
-            <span>Hybrid Search</span>
-          </button>
+        <div className="segmented" role="tablist" aria-label="Search mode">
+          {modes.map((m) => (
+            <button
+              key={m.key}
+              type="button"
+              role="tab"
+              aria-selected={mode === m.key}
+              className={`btn ${mode === m.key ? "btn-primary" : "btn-outline"}`}
+              onClick={() => setMode(m.key)}
+            >
+              {m.icon}
+              <span>{m.label}</span>
+            </button>
+          ))}
         </div>
       </header>
 
-      {error && (
-        <div className="error-state">
-          <AlertCircle size={20} />
-          <span>{error}</span>
-        </div>
-      )}
-
-      {activeMode === "qa" && (
+      {mode === "qa" && (
         <div className="search-panel">
-          <form onSubmit={handleQA} className="card" style={{ padding: "24px" }}>
-            <h2 className="card-title">Ask Organizational Memory</h2>
+          <form onSubmit={handleQA} className="card">
+            <h2 className="card-title">Ask your organizational memory</h2>
+            <label htmlFor={`${ids}-q`} className="sr-only">Question</label>
             <div className="search-box">
-              <input
-                type="text"
-                className="form-input search-input"
-                value={question}
-                onChange={(e) => setQuestion(e.target.value)}
-                placeholder="e.g. Why are we adopting PostgreSQL instead of MongoDB?"
-                required
-              />
-              <button type="submit" className="btn btn-primary" style={{ padding: "0 28px" }} disabled={loading}>
-                {loading ? "Thinking..." : "Ask"}
+              <input id={`${ids}-q`} type="text" className="form-input search-input" value={question} onChange={(e) => setQuestion(e.target.value)} placeholder="e.g. Which database did we decide on?" required />
+              <button type="submit" className="btn btn-primary" disabled={qa.loading}>
+                {qa.loading ? "Thinking..." : "Ask"}
               </button>
             </div>
+            <button type="button" className="link-evidence" style={{ marginTop: 14 }} onClick={() => setShowOverride((v) => !v)} aria-expanded={showOverride}>
+              {showOverride ? "Hide advanced planner settings" : "Show advanced planner settings"}
+            </button>
+            {showOverride && (
+              <div className="grid-2 override-panel">
+                <div className="form-group">
+                  <label className="form-label" htmlFor={`${ids}-op`}>Person</label>
+                  <input id={`${ids}-op`} className="form-input" value={overridePerson} onChange={(e) => setOverridePerson(e.target.value)} placeholder="e.g. Rahul" />
+                </div>
+                <div className="form-group">
+                  <label className="form-label" htmlFor={`${ids}-ot`}>Topic</label>
+                  <input id={`${ids}-ot`} className="form-input" value={overrideTopic} onChange={(e) => setOverrideTopic(e.target.value)} placeholder="e.g. Database" />
+                </div>
+                <div className="form-group">
+                  <label className="form-label" htmlFor={`${ids}-oty`}>Fact type</label>
+                  <select id={`${ids}-oty`} className="form-select" value={overrideType} onChange={(e) => setOverrideType(e.target.value)}>
+                    <option value="">Any</option>
+                    <option value="decision">Decision</option>
+                    <option value="action">Action / commitment</option>
+                    <option value="issue">Issue</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label className="form-label" htmlFor={`${ids}-oe`}>Entities (comma separated)</label>
+                  <input id={`${ids}-oe`} className="form-input" value={overrideEntities} onChange={(e) => setOverrideEntities(e.target.value)} placeholder="e.g. PostgreSQL, Redis" />
+                </div>
+              </div>
+            )}
+          </form>
 
-            <div style={{ marginTop: "16px" }}>
-              <button
-                type="button"
-                className="link-evidence"
-                style={{ fontSize: "13px" }}
-                onClick={() => setShowOverride(!showOverride)}
-              >
-                {showOverride ? "Hide Advanced Planner Parameters" : "Show Advanced Planner Parameters"}
-              </button>
-
-              {showOverride && (
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginTop: "14px", padding: "16px", border: "1px solid var(--border-light)", borderRadius: "8px", backgroundColor: "rgba(0,0,0,0.15)" }}>
-                  <div className="form-group">
-                    <label className="form-label">Plan Override: Person</label>
-                    <input
-                      type="text"
-                      className="form-input"
-                      value={overridePerson}
-                      onChange={(e) => setOverridePerson(e.target.value)}
-                      placeholder="e.g. Rahul"
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">Plan Override: Topic</label>
-                    <input
-                      type="text"
-                      className="form-input"
-                      value={overrideTopic}
-                      onChange={(e) => setOverrideTopic(e.target.value)}
-                      placeholder="e.g. Database"
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">Plan Override: Type</label>
-                    <select
-                      className="form-select"
-                      value={overrideType}
-                      onChange={(e) => setOverrideType(e.target.value)}
-                    >
-                      <option value="">(None)</option>
-                      <option value="decision">Decision</option>
-                      <option value="action">Action / Commitment</option>
-                      <option value="issue">Issue</option>
-                      <option value="timeline">Timeline</option>
-                    </select>
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">Plan Override: Entities (comma separated)</label>
-                    <input
-                      type="text"
-                      className="form-input"
-                      value={overrideEntities}
-                      onChange={(e) => setOverrideEntities(e.target.value)}
-                      placeholder="e.g. PostgreSQL, Redis"
-                    />
-                  </div>
+          {qa.loading && <Spinner message="Retrieving evidence and composing an answer..." />}
+          {qa.error && <Notice tone="error">{qa.error}</Notice>}
+          {!qa.loading && qa.result && (
+            <div className="stack">
+              <div className="card answer-card">
+                <div className="answer-header">
+                  <h3 className="card-title with-icon">
+                    <TrendingUp size={18} aria-hidden="true" /> Answer
+                  </h3>
+                  <Confidence value={qa.result.confidence} />
+                </div>
+                <p className="answer-text">{qa.result.answer}</p>
+                {qa.result.model_name && <p className="muted small">Answered by: {qa.result.model_name}</p>}
+                {qa.result.reasoning_path.length > 0 && (
+                  <details className="reasoning-list">
+                    <summary>How this answer was produced</summary>
+                    <ol>
+                      {qa.result.reasoning_path.map((step, idx) => (
+                        <li key={idx} className="reasoning-step">{step}</li>
+                      ))}
+                    </ol>
+                  </details>
+                )}
+              </div>
+              <h4 className="evidence-title">Evidence ({qa.result.evidence.length})</h4>
+              {qa.result.evidence.length === 0 ? (
+                <div className="card empty-state compact">
+                  <HelpCircle size={32} className="empty-state-icon" aria-hidden="true" />
+                  <p>No transcript evidence was returned for this question.</p>
+                </div>
+              ) : (
+                <div className="evidence-grid">
+                  {qa.result.evidence.map((ev, i) => (
+                    <div key={`${ev.segment_id}-${i}`} className="card evidence-card accent-purple">
+                      <div className="evidence-header">
+                        <span className="muted">{formatSpan(ev.start_time, ev.end_time) ?? "Timestamp unavailable"}</span>
+                      </div>
+                      <p className="evidence-snippet">“{ev.text_snapshot}”</p>
+                      <div className="card-actions">
+                        <SourceLink meetingId={ev.meeting_id} segmentId={ev.segment_id} label="Go to the transcript" />
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
-          </form>
-
-          {loading && <Spinner message="Querying RAG and synthesizing answer..." />}
-
-          {qaResponse && (
-            <div className="search-results-panel" style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
-              <div className="card answer-card">
-                <div className="answer-header">
-                  <h3 className="card-title" style={{ margin: 0, display: "flex", alignItems: "center", gap: "8px" }}>
-                    <TrendingUp size={18} className="text-accent-indigo" />
-                    <span>Grounded Answer Synthesis</span>
-                  </h3>
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                    <span className="form-label" style={{ margin: 0 }}>Confidence:</span>
-                    <div className="confidence-bar-bg">
-                      <div className="confidence-bar" style={{ width: `${qaResponse.confidence * 100}%` }}></div>
-                    </div>
-                    <span style={{ fontSize: "12px", fontWeight: 700 }}>
-                      {Math.round(qaResponse.confidence * 100)}%
-                    </span>
-                  </div>
-                </div>
-                <p className="answer-text">{qaResponse.answer}</p>
-                
-                {qaResponse.reasoning_path && qaResponse.reasoning_path.length > 0 && (
-                  <div className="reasoning-list">
-                    <span style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase", color: "var(--text-muted)", marginBottom: "4px" }}>Reasoning Steps:</span>
-                    {qaResponse.reasoning_path.map((step, idx) => (
-                      <div key={idx} className="reasoning-step">
-                        <span>[{idx + 1}]</span>
-                        <span>{step}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <div>
-                <h4 className="evidence-title">Retrieved Evidence & Citations</h4>
-                {qaResponse.evidence.length === 0 ? (
-                  <div className="card empty-state" style={{ padding: "30px 0" }}>
-                    <HelpCircle size={32} className="empty-state-icon" />
-                    <p>No direct transcript evidence links returned for this query.</p>
-                  </div>
-                ) : (
-                  <div className="evidence-grid">
-                    {qaResponse.evidence.map((ev, i) => (
-                      <div key={i} className="card evidence-card" style={{ borderLeft: "3px solid var(--accent-purple)" }}>
-                        <div className="evidence-header">
-                          <span style={{ fontWeight: 600 }}>Citing segment <code>{ev.segment_id}</code></span>
-                          <span>
-                            Timestamp: {Math.floor(ev.start_time / 60)}:
-                            {String(Math.floor(ev.start_time % 60)).padStart(2, "0")} -{" "}
-                            {Math.floor(ev.end_time / 60)}:
-                            {String(Math.floor(ev.end_time % 60)).padStart(2, "0")}
-                          </span>
-                        </div>
-                        <p className="evidence-snippet">"{ev.text_snapshot}"</p>
-                        <div style={{ marginTop: "12px", textAlign: "right" }}>
-                          <button
-                            className="link-evidence"
-                            style={{ fontSize: "12px" }}
-                            onClick={() => navigate(`/meetings/${ev.meeting_id}?highlight=${ev.segment_id}`)}
-                          >
-                            Go to Source Segment <ArrowRight size={12} />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
           )}
         </div>
       )}
 
-      {activeMode === "agentic" && (
+      {mode === "agentic" && (
         <div className="search-panel">
-          <form onSubmit={handleAgentic} className="card" style={{ padding: "24px" }}>
-            <h2 className="card-title">Ask Agentic Organizational Reasoning</h2>
+          <form onSubmit={handleAgentic} className="card">
+            <h2 className="card-title">Multi-agent reasoning</h2>
+            <label htmlFor={`${ids}-aq`} className="sr-only">Question</label>
             <div className="search-box">
-              <input
-                type="text"
-                className="form-input search-input"
-                value={agenticQuestion}
-                onChange={(e) => setAgenticQuestion(e.target.value)}
-                placeholder="e.g. Why was PostgreSQL chosen instead of MongoDB?"
-                required
-              />
-              <button type="submit" className="btn btn-primary" style={{ padding: "0 28px" }} disabled={loading}>
-                {loading ? "Reasoning..." : "Execute"}
+              <input id={`${ids}-aq`} type="text" className="form-input search-input" value={agenticQuestion} onChange={(e) => setAgenticQuestion(e.target.value)} placeholder="e.g. What happened to the storage layer decision?" required />
+              <button type="submit" className="btn btn-primary" disabled={agentic.loading}>
+                {agentic.loading ? "Reasoning..." : "Ask"}
               </button>
             </div>
           </form>
 
-          {loading && <Spinner message="Orchestrating agent workflow and synthesizing grounded answer..." />}
-
-          {agenticResponse && (
-            <div className="search-results-panel" style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+          {agentic.loading && <Spinner message="Running planner, retrieval, temporal and evidence agents..." />}
+          {agentic.error && <Notice tone="error">{agentic.error}</Notice>}
+          {!agentic.loading && agentic.result && (
+            <div className="stack">
               <div className="card answer-card">
                 <div className="answer-header">
-                  <h3 className="card-title" style={{ margin: 0, display: "flex", alignItems: "center", gap: "8px" }}>
-                    <Cpu size={18} style={{ color: "var(--accent-purple)" }} />
-                    <span>Agentic Answer Synthesis</span>
+                  <h3 className="card-title with-icon">
+                    <Cpu size={18} aria-hidden="true" /> Answer
                   </h3>
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                    <span className="form-label" style={{ margin: 0 }}>Confidence:</span>
-                    <div className="confidence-bar-bg">
-                      <div className="confidence-bar" style={{ width: `${agenticResponse.confidence * 100}%` }}></div>
-                    </div>
-                    <span style={{ fontSize: "12px", fontWeight: 700 }}>
-                      {Math.round(agenticResponse.confidence * 100)}%
-                    </span>
-                  </div>
+                  <Confidence value={agentic.result.confidence} />
                 </div>
-                
-                {agenticResponse.insufficient_evidence && (
-                  <div className="error-state" style={{ marginTop: "12px", marginBottom: "12px", background: "rgba(220, 53, 69, 0.1)", border: "1px solid rgba(220, 53, 69, 0.3)", color: "#ea868f" }}>
-                    <AlertCircle size={16} />
-                    <span>INSUFFICIENT EVIDENCE: Unconfirmed assertions rejected.</span>
+                {agentic.result.insufficient_evidence && (
+                  <Notice tone="info">
+                    <AlertCircle size={14} aria-hidden="true" /> The meetings do not contain enough evidence to answer this.
+                  </Notice>
+                )}
+                <p className="answer-text">{agentic.result.answer}</p>
+                <p className="muted small">Agents: {agentic.result.reasoning_summary}</p>
+                <table className="table compact-table">
+                  <thead>
+                    <tr>
+                      <th scope="col">Agent</th>
+                      <th scope="col">Status</th>
+                      <th scope="col">Details</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {agentic.result.trace.map((t, idx) => (
+                      <tr key={idx}>
+                        <td>{humanize(t.agent)}</td>
+                        <td className={t.status === "failed" ? "text-danger" : t.status === "skipped" ? "muted" : "text-success"}>{humanize(t.status)}</td>
+                        <td className="muted">
+                          {t.error ??
+                            [
+                              t.evidence_count ? `${t.evidence_count} evidence` : null,
+                              t.events_count ? `${t.events_count} events` : null,
+                              t.relations_count ? `${t.relations_count} relations` : null,
+                              t.duration_seconds ? `${Math.round(t.duration_seconds * 1000)} ms` : null,
+                            ]
+                              .filter(Boolean)
+                              .join(" · ")}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {agentic.result.conflicts && agentic.result.conflicts.length > 0 && (
+                  <div className="conflicts">
+                    <h4 className="form-label">Changes detected over time</h4>
+                    {agentic.result.conflicts.map((c, i) => (
+                      <p key={i} className="small">
+                        <span className="text-warning">Earlier:</span> {c.earlier_claim}
+                        <br />
+                        <span className="text-success">Later:</span> {c.latest_claim}
+                      </p>
+                    ))}
                   </div>
                 )}
-                
-                <p className="answer-text" style={{ fontStyle: agenticResponse.insufficient_evidence ? "italic" : "normal" }}>
-                  {agenticResponse.answer}
-                </p>
+              </div>
 
-                {agenticResponse.reasoning_summary && (
-                  <div style={{ marginTop: "16px", display: "flex", flexWrap: "wrap", alignItems: "center", gap: "8px" }}>
-                    <span style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase", color: "var(--text-muted)" }}>Agent Flow:</span>
-                    <code style={{ fontSize: "12px", background: "rgba(255,255,255,0.08)", padding: "4px 8px", borderRadius: "4px", color: "#a78bfa" }}>
-                      {agenticResponse.reasoning_summary}
-                    </code>
-                  </div>
-                )}
-
-                {agenticResponse.trace && agenticResponse.trace.length > 0 && (
-                  <div className="reasoning-list" style={{ marginTop: "20px" }}>
-                    <span style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase", color: "var(--text-muted)", marginBottom: "8px", display: "block" }}>Agent Trace Metrics:</span>
-                    {agenticResponse.trace.map((t, idx) => (
-                      <div key={idx} className="reasoning-step" style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
-                        <span style={{ fontWeight: 600 }}>{t.agent.charAt(0).toUpperCase() + t.agent.slice(1)} Agent</span>
-                        <span style={{ color: t.status === "completed" ? "#34d399" : t.status === "skipped" ? "var(--text-muted)" : "#f87171" }}>
-                          {t.status.toUpperCase()} {t.duration_seconds !== undefined && t.duration_seconds > 0 ? `(${t.duration_seconds}s)` : ""}
-                          {t.evidence_count !== undefined && t.evidence_count > 0 ? ` [${t.evidence_count} evidence]` : ""}
-                          {t.events_count !== undefined && t.events_count > 0 ? ` [${t.events_count} events]` : ""}
-                          {t.relations_count !== undefined && t.relations_count > 0 ? ` [${t.relations_count} relations]` : ""}
+              <h4 className="evidence-title">Evidence ({agentic.result.evidence.length})</h4>
+              {agentic.result.evidence.length === 0 ? (
+                <div className="card empty-state compact">
+                  <HelpCircle size={32} className="empty-state-icon" aria-hidden="true" />
+                  <p>No evidence was retrieved.</p>
+                </div>
+              ) : (
+                <div className="evidence-grid">
+                  {agentic.result.evidence.map((ev, i) => (
+                    <div key={`${ev.segment_id}-${i}`} className="card evidence-card accent-purple">
+                      <div className="evidence-header">
+                        <strong>{ev.meeting_title || "Meeting"}</strong>
+                        <span className="muted">
+                          {formatDate(ev.meeting_date)}
+                          {formatSpan(ev.start_time, ev.end_time) ? ` · ${formatSpan(ev.start_time, ev.end_time)}` : ""}
                         </span>
                       </div>
-                    ))}
-                  </div>
-                )}
-
-                {agenticResponse.citations && agenticResponse.citations.length > 0 && (
-                  <div style={{ marginTop: "20px", borderTop: "1px solid var(--border-light)", paddingTop: "12px" }}>
-                    <span style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase", color: "var(--text-muted)", display: "block", marginBottom: "6px" }}>Source Citations:</span>
-                    <ul style={{ paddingLeft: "16px", margin: 0, fontSize: "13px", display: "flex", flexDirection: "column", gap: "4px" }}>
-                      {agenticResponse.citations.map((c, i) => (
-                        <li key={i}>{c}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </div>
-
-              <div>
-                <h4 className="evidence-title">Retrieved Evidence & Citations</h4>
-                {agenticResponse.evidence.length === 0 ? (
-                  <div className="card empty-state" style={{ padding: "30px 0" }}>
-                    <HelpCircle size={32} className="empty-state-icon" />
-                    <p>No direct transcript evidence links returned for this query.</p>
-                  </div>
-                ) : (
-                  <div className="evidence-grid">
-                    {agenticResponse.evidence.map((ev, i) => (
-                      <div key={i} className="card evidence-card" style={{ borderLeft: "3px solid var(--accent-purple)" }}>
-                        <div className="evidence-header">
-                          <span style={{ fontWeight: 600 }}>Citing segment <code>{ev.segment_id}</code></span>
-                          <span>
-                            Timestamp: {Math.floor(ev.start_time / 60)}:
-                            {String(Math.floor(ev.start_time % 60)).padStart(2, "0")} -{" "}
-                            {Math.floor(ev.end_time / 60)}:
-                            {String(Math.floor(ev.end_time % 60)).padStart(2, "0")}
-                          </span>
-                        </div>
-                        <p className="evidence-snippet">"{ev.content}"</p>
-                        <div style={{ marginTop: "12px", textAlign: "right" }}>
-                          <button
-                            className="link-evidence"
-                            style={{ fontSize: "12px" }}
-                            onClick={() => navigate(`/meetings/${ev.meeting_id}?highlight=${ev.segment_id}`)}
-                          >
-                            Go to Source Segment <ArrowRight size={12} />
-                          </button>
-                        </div>
+                      <p className="evidence-snippet">“{ev.content}”</p>
+                      <div className="card-actions">
+                        <span className="muted small">{humanize(ev.source_type)}</span>
+                        <SourceLink meetingId={ev.meeting_id} segmentId={ev.segment_id} label="Go to the transcript" />
                       </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>
       )}
 
-      {activeMode === "search" && (
+      {mode === "search" && (
         <div className="search-panel">
-          <form onSubmit={handleSearch} className="card" style={{ padding: "24px" }}>
-            <h2 className="card-title">Run Hybrid Relational/Vector Search</h2>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
-              <div className="form-group" style={{ gridColumn: "1 / -1" }}>
-                <label className="form-label">Search Query (q)</label>
-                <input
-                  type="text"
-                  className="form-input"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="e.g. Postgres vs Mongo decision"
-                />
+          <form onSubmit={handleSearch} className="card">
+            <h2 className="card-title">Hybrid search</h2>
+            <div className="grid-2">
+              <div className="form-group span-2">
+                <label className="form-label" htmlFor={`${ids}-sq`}>Search text</label>
+                <input id={`${ids}-sq`} type="text" className="form-input" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="e.g. storage layer decision" />
               </div>
               <div className="form-group">
-                <label className="form-label">Result Type Filter</label>
-                <select className="form-select" value={searchType} onChange={(e) => setSearchType(e.target.value)}>
-                  <option value="">All Result Types</option>
-                  <option value="transcript">Transcript Segment</option>
+                <label className="form-label" htmlFor={`${ids}-st`}>Result type</label>
+                <select id={`${ids}-st`} className="form-select" value={searchType} onChange={(e) => setSearchType(e.target.value)}>
+                  <option value="">All result types</option>
+                  <option value="transcript">Transcript segment</option>
                   <option value="decision">Decision</option>
-                  <option value="action">Action / Commitment</option>
+                  <option value="action">Action / commitment</option>
                   <option value="issue">Issue</option>
                 </select>
               </div>
               <div className="form-group">
-                <label className="form-label">Associated Person</label>
-                <input
-                  type="text"
-                  className="form-input"
-                  value={searchPerson}
-                  onChange={(e) => setSearchPerson(e.target.value)}
-                  placeholder="e.g. Rahul"
-                />
+                <label className="form-label" htmlFor={`${ids}-sp`}>Action owner</label>
+                <input id={`${ids}-sp`} type="text" className="form-input" value={searchPerson} onChange={(e) => setSearchPerson(e.target.value)} placeholder="e.g. rahul" />
               </div>
               <div className="form-group">
-                <label className="form-label">Associated Topic</label>
-                <input
-                  type="text"
-                  className="form-input"
-                  value={searchTopic}
-                  onChange={(e) => setSearchTopic(e.target.value)}
-                  placeholder="e.g. Database"
-                />
+                <label className="form-label" htmlFor={`${ids}-stp`}>Topic</label>
+                <input id={`${ids}-stp`} type="text" className="form-input" value={searchTopic} onChange={(e) => setSearchTopic(e.target.value)} placeholder="e.g. Database" />
               </div>
               <div className="form-group">
-                <label className="form-label">Start Date</label>
-                <input
-                  type="date"
-                  className="form-input"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                />
+                <label className="form-label" htmlFor={`${ids}-sd`}>From</label>
+                <input id={`${ids}-sd`} type="date" className="form-input" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
               </div>
               <div className="form-group">
-                <label className="form-label">End Date</label>
-                <input
-                  type="date"
-                  className="form-input"
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                />
+                <label className="form-label" htmlFor={`${ids}-ed`}>To (inclusive)</label>
+                <input id={`${ids}-ed`} type="date" className="form-input" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
               </div>
             </div>
-            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "20px" }}>
-              <button type="submit" className="btn btn-primary" style={{ padding: "10px 24px" }} disabled={loading}>
-                {loading ? "Searching..." : "Search"}
+            <div className="form-actions">
+              <button type="submit" className="btn btn-primary" disabled={search.loading}>
+                {search.loading ? "Searching..." : "Search"}
               </button>
             </div>
           </form>
 
-          {loading && <Spinner message="Searching organizational memory..." />}
-
-          {searchResults && (
+          {search.loading && <Spinner message="Searching..." />}
+          {search.error && <Notice tone="error">{search.error}</Notice>}
+          {!search.loading && search.result && (
             <div>
-              <h4 className="evidence-title">Search Results ({searchResults.total_results} found)</h4>
-              {searchResults.results.length === 0 ? (
-                <div className="card empty-state" style={{ padding: "40px 0" }}>
-                  <Search size={48} className="empty-state-icon" />
-                  <p>No records matched your search query and filters.</p>
+              <h4 className="evidence-title">
+                {search.result.total_results} result{search.result.total_results === 1 ? "" : "s"}
+              </h4>
+              {search.result.results.length === 0 ? (
+                <div className="card empty-state compact">
+                  <Search size={32} className="empty-state-icon" aria-hidden="true" />
+                  <p>Nothing matched your search and filters.</p>
                 </div>
               ) : (
                 <div className="evidence-grid">
-                  {searchResults.results.map((res) => (
-                    <div key={res.id} className="card evidence-card" style={{ borderLeft: "3px solid var(--accent-sky)" }}>
+                  {search.result.results.map((res) => (
+                    <div key={res.id} className="card evidence-card accent-sky">
                       <div className="evidence-header">
-                        <span style={{ fontWeight: 600, color: "var(--accent-sky)" }}>
-                          {res.meeting_title}
-                        </span>
-                        <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
-                          <Calendar size={12} />
-                          {new Date(res.meeting_date).toLocaleDateString()}
-                        </span>
+                        <strong>{res.meeting_title}</strong>
+                        <span className="muted">{formatDate(res.meeting_date)}</span>
                       </div>
-                      <div style={{ display: "flex", justifyContent: "space-between", margin: "6px 0", fontSize: "11px", color: "var(--text-muted)" }}>
-                        <span>Type: <code>{res.source_type}</code></span>
-                        <span>Score: <code>{res.score}</code></span>
+                      <div className="evidence-header muted small">
+                        <span>{humanize(res.source_type)}{formatSpan(res.start_time, res.end_time) ? ` · ${formatSpan(res.start_time, res.end_time)}` : ""}</span>
+                        <span>Relevance {formatScore(res.score)}</span>
                       </div>
-                      <p className="evidence-snippet">"{res.text}"</p>
-                      
-                      <div style={{ marginTop: "12px", display: "flex", justifyContent: "flex-end" }}>
-                        <button
-                          className="link-evidence"
-                          style={{ fontSize: "12px" }}
-                          onClick={() => {
-                            if (res.segment_id) {
-                              navigate(`/meetings/${res.meeting_id}?highlight=${res.segment_id}`)
-                            } else {
-                              navigate(`/meetings/${res.meeting_id}`)
-                            }
-                          }}
-                        >
-                          Open Meeting View <ArrowRight size={12} />
-                        </button>
+                      <p className="evidence-snippet">“{res.text}”</p>
+                      <div className="card-actions">
+                        <SourceLink meetingId={res.meeting_id} segmentId={res.segment_id} label="Open meeting" />
                       </div>
                     </div>
                   ))}

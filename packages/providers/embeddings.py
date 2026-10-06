@@ -292,7 +292,7 @@ def get_embedder(
         from packages.providers.gemini import GeminiEmbedder
 
         return GeminiEmbedder(
-            model_name=model_name or "text-embedding-004",
+            model_name=model_name or "gemini-embedding-001",
             base_url=base_url or "https://generativelanguage.googleapis.com",
             api_key=api_key,
             dimension=dimension if dimension != 384 else 768,

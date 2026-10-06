@@ -1,4 +1,5 @@
 import time
+from datetime import UTC, datetime
 from typing import Any
 
 from packages.agents.base import BaseAgent
@@ -14,11 +15,15 @@ class EvidenceAgent(BaseAgent):
         if len(context.retrieved_evidence) < 2:
             return conflicts
 
-        # Sort evidence chronologically
-        ordered_ev = sorted(
-            context.retrieved_evidence,
-            key=lambda e: (e.meeting_date or e.meeting_id, e.start_time),
-        )
+        # Sort evidence chronologically (evidence without a date sorts first)
+        epoch = datetime(1970, 1, 1, tzinfo=UTC)
+
+        def when(e: Any) -> datetime:
+            d = e.meeting_date or epoch
+            return d if d.tzinfo else d.replace(tzinfo=UTC)
+
+        ordered_ev = sorted(context.retrieved_evidence, key=lambda e: (when(e), e.start_time))
+        seen_pairs: set[tuple[str, str]] = set()
 
         reversal_terms = [
             "reverse",
@@ -33,6 +38,15 @@ class EvidenceAgent(BaseAgent):
         for i in range(len(ordered_ev) - 1):
             earlier = ordered_ev[i]
             later = ordered_ev[i + 1]
+
+            # A lifecycle transition needs two different meetings; comparing a meeting's
+            # decision with its own transcript produced bogus "conflicts" with itself.
+            if earlier.meeting_id == later.meeting_id:
+                continue
+            pair = (earlier.segment_id, later.segment_id)
+            if pair in seen_pairs:
+                continue
+            seen_pairs.add(pair)
 
             earlier_text = earlier.content.lower()
             later_text = later.content.lower()

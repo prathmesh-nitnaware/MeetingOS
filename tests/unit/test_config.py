@@ -4,13 +4,19 @@ from pydantic import ValidationError
 
 
 def test_settings_defaults():
-    s = Settings()
+    # Code defaults, independent of the developer's .env file
+    s = Settings(_env_file=None)  # pyright: ignore[reportCallIssue]
     assert s.app_name == "MeetingOS API"
     assert s.api_v1_prefix == "/api/v1"
     assert "postgresql+asyncpg" in s.database_url
     assert "redis://" in s.redis_url
-    assert s.asr_provider == "mock"
-    assert s.ner_provider == "mock"
+    # Real speech-to-text and a grounded local reasoner by default (no canned mock output)
+    assert s.asr_provider == "whisper"
+    assert s.diarizer_provider == "none"
+    assert s.reasoner_provider == "local"
+    assert s.embedding_provider == "local"
+    assert s.dev_auth_enabled is True
+    assert "*" not in s.allowed_origins
 
 
 def test_invalid_provider_validation():

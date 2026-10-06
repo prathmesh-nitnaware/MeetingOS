@@ -1,421 +1,319 @@
-import React, { useState, useEffect } from "react"
-import { api, ConnectorStatus, AuditLog } from "../services/api"
+import React, { useCallback, useEffect, useId, useState } from "react"
+import { KeyRound, RefreshCw, ShieldAlert, Trash2 } from "lucide-react"
+import { useAuth } from "../auth/AuthContext"
+import { Notice } from "../components/Notice"
 import { Spinner } from "../components/Spinner"
-import { Key, RefreshCw, Trash2, ShieldAlert, CheckCircle, XCircle, Info } from "lucide-react"
+import { api, type AuditLog, type AuthConfig, type ConnectorStatus, type RetentionResult } from "../services/api"
+import { formatDateTime, humanize } from "../utils/format"
+
+const RETENTION_FIELDS = [
+  { key: "meeting_days", label: "Delete meetings older than (days)" },
+  { key: "transcript_days", label: "Delete transcripts older than (days)" },
+  { key: "evidence_days", label: "Delete evidence & search index older than (days)" },
+  { key: "audio_days", label: "Delete uploaded audio older than (days)" },
+  { key: "audit_log_days", label: "Delete audit logs older than (days)" },
+] as const
+type RetentionKey = (typeof RETENTION_FIELDS)[number]["key"]
 
 export const Settings: React.FC = () => {
-  const [token, setToken] = useState(localStorage.getItem("meetingos_token") || "")
+  const ids = useId()
+  const { profile, hasPermission, signInWithToken, switchOrganization } = useAuth()
+  const isAdmin = profile?.role === "admin" || profile?.role === "owner"
+
+  const [authConfig, setAuthConfig] = useState<AuthConfig | null>(null)
+  const [accountMessage, setAccountMessage] = useState<string | null>(null)
+
   const [connectors, setConnectors] = useState<ConnectorStatus[]>([])
-  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([])
-  
-  // Loading & Error states
-  const [loadingConnectors, setLoadingConnectors] = useState(false)
-  const [loadingLogs, setLoadingLogs] = useState(false)
   const [connectorError, setConnectorError] = useState<string | null>(null)
-  const [logError, setLogError] = useState<string | null>(null)
+  const [loadingConnectors, setLoadingConnectors] = useState(true)
+  const [syncing, setSyncing] = useState<string | null>(null)
+  const [syncMessage, setSyncMessage] = useState<{ tone: "success" | "error"; text: string } | null>(null)
 
-  // Sync statuses
-  const [syncingProvider, setSyncingProvider] = useState<string | null>(null)
-  const [syncMessage, setSyncMessage] = useState<string | null>(null)
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([])
+  const [auditError, setAuditError] = useState<string | null>(null)
+  const [loadingLogs, setLoadingLogs] = useState(false)
 
-  // Retention cleanup states
-  const [meetingDays, setMeetingDays] = useState<number>(30)
-  const [transcriptDays, setTranscriptDays] = useState<number>(30)
-  const [evidenceDays, setEvidenceDays] = useState<number>(30)
-  const [auditDays, setAuditDays] = useState<number>(90)
+  const [retention, setRetention] = useState<Record<RetentionKey, string>>({
+    meeting_days: "",
+    transcript_days: "",
+    evidence_days: "",
+    audio_days: "",
+    audit_log_days: "",
+  })
   const [dryRun, setDryRun] = useState(true)
   const [purging, setPurging] = useState(false)
-  const [purgeResult, setPurgeResult] = useState<any | null>(null)
+  const [purgeResult, setPurgeResult] = useState<RetentionResult | null>(null)
   const [purgeError, setPurgeError] = useState<string | null>(null)
 
-  // Load configuration and data
-  const loadConnectors = async () => {
+  const loadConnectors = useCallback(async () => {
     setLoadingConnectors(true)
     setConnectorError(null)
     try {
-      const res = await api.getConnectors()
-      setConnectors(res)
-    } catch (err: any) {
-      setConnectorError(err.message || "Failed to load connector statuses.")
+      setConnectors(await api.getConnectors())
+    } catch (err) {
+      setConnectorError(err instanceof Error ? err.message : "Failed to load connectors.")
     } finally {
       setLoadingConnectors(false)
     }
-  }
+  }, [])
 
-  const loadAuditLogs = async () => {
+  const loadAuditLogs = useCallback(async () => {
+    if (!isAdmin) return
     setLoadingLogs(true)
-    setLogError(null)
+    setAuditError(null)
     try {
-      const logs = await api.getAuditLogs(undefined, undefined, 20, 0)
-      setAuditLogs(logs)
-    } catch (err: any) {
-      setLogError(err.message || "Failed to load system audit logs. Ensure you are authenticated as Admin.")
+      setAuditLogs(await api.getAuditLogs(25, 0))
+    } catch (err) {
+      setAuditError(err instanceof Error ? err.message : "Failed to load audit logs.")
     } finally {
       setLoadingLogs(false)
     }
-  }
+  }, [isAdmin])
 
   useEffect(() => {
-    loadConnectors()
-    loadAuditLogs()
-  }, [token])
+    void loadConnectors()
+    void loadAuditLogs()
+    api.getAuthConfig().then(setAuthConfig).catch(() => setAuthConfig(null))
+  }, [loadConnectors, loadAuditLogs])
 
-  const handleSaveToken = (val: string) => {
-    setToken(val)
-    if (val) {
-      localStorage.setItem("meetingos_token", val)
-    } else {
-      localStorage.removeItem("meetingos_token")
-    }
-  }
-
-  const handleTriggerSync = async (provider: string) => {
-    setSyncingProvider(provider)
+  const handleSync = async (provider: string) => {
+    setSyncing(provider)
     setSyncMessage(null)
     try {
       const res = await api.triggerConnectorSync(provider)
-      setSyncMessage(`Sync triggered successfully! Task ID: ${res.task_id}`)
-      loadConnectors()
-      loadAuditLogs()
-    } catch (err: any) {
-      setSyncMessage(`Sync failed: ${err.message}`)
+      setSyncMessage({ tone: "success", text: `Sync queued for ${humanize(provider)} (task ${res.task_id}).` })
+      void loadAuditLogs()
+    } catch (err) {
+      setSyncMessage({ tone: "error", text: err instanceof Error ? err.message : "Sync failed." })
     } finally {
-      setSyncingProvider(null)
+      setSyncing(null)
     }
   }
 
-  const handleRunRetention = async (e: React.FormEvent) => {
+  const handleRetention = async (e: React.FormEvent) => {
     e.preventDefault()
+    const params: Record<string, number | boolean> = { dry_run: dryRun }
+    for (const { key } of RETENTION_FIELDS) {
+      const value = parseInt(retention[key], 10)
+      if (retention[key] && (Number.isNaN(value) || value < 1)) {
+        setPurgeError("Retention periods must be whole numbers of at least 1 day.")
+        return
+      }
+      if (!Number.isNaN(value)) params[key] = value
+    }
+    if (Object.keys(params).length === 1) {
+      setPurgeError("Enter at least one retention period.")
+      return
+    }
+    if (
+      !dryRun &&
+      !window.confirm(
+        `Permanently delete matching data from "${profile?.organization_name ?? profile?.org_id}"? This cannot be undone.`
+      )
+    ) {
+      return
+    }
     setPurging(true)
     setPurgeError(null)
     setPurgeResult(null)
     try {
-      const res = await api.runRetentionCleanup({
-        meeting_days: meetingDays,
-        transcript_days: transcriptDays,
-        evidence_days: evidenceDays,
-        audit_log_days: auditDays,
-        dry_run: dryRun
-      })
-      setPurgeResult(res)
-      loadAuditLogs()
-    } catch (err: any) {
-      setPurgeError(err.message || "Failed to execute retention policy cleanup.")
+      setPurgeResult(await api.runRetentionCleanup(params))
+      void loadAuditLogs()
+    } catch (err) {
+      setPurgeError(err instanceof Error ? err.message : "Retention cleanup failed.")
     } finally {
       setPurging(false)
     }
   }
 
+  const switchTo = async (action: () => Promise<void>) => {
+    setAccountMessage(null)
+    try {
+      await action()
+    } catch (err) {
+      setAccountMessage(err instanceof Error ? err.message : "Could not switch.")
+    }
+  }
+
   return (
-    <div className="temporal-timeline-container" style={{ padding: "2rem" }}>
-      <div className="timeline-header" style={{ marginBottom: "2rem" }}>
-        <h1>System Administration & Hardening</h1>
-        <p className="timeline-subtitle">
-          Configure connectors, manage retention policy schedules, inspect system audit logs, and test access authorization roles.
-        </p>
-      </div>
-
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "2rem", marginBottom: "2rem" }}>
-        {/* Developer Token / Auth Role Panel */}
-        <div className="timeline-card">
-          <div className="card-header" style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-            <Key className="text-primary" size={20} />
-            <h2>Developer Authentication Boundary</h2>
-          </div>
-          <div className="card-content" style={{ marginTop: "1rem" }}>
-            <p style={{ fontSize: "0.9rem", color: "var(--text-secondary)", marginBottom: "1rem" }}>
-              Select a development token to configure your current authorization role.
-            </p>
-            <div style={{ display: "flex", flexDirection: "column", gap: "0.8rem" }}>
-              <div style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--accent-color, #3b82f6)", marginTop: "0.2rem" }}>
-                ORGANIZATION A (Development Workspace - org_dev)
-              </div>
-              <button
-                className={`timeline-btn ${token === "admin-secret-token" ? "btn-primary" : "btn-secondary"}`}
-                onClick={() => handleSaveToken("admin-secret-token")}
-                style={{ textAlign: "left", justifyContent: "flex-start" }}
-              >
-                Org A: Admin Role (Full Access)
-              </button>
-              <button
-                className={`timeline-btn ${token === "member-secret-token" ? "btn-primary" : "btn-secondary"}`}
-                onClick={() => handleSaveToken("member-secret-token")}
-                style={{ textAlign: "left", justifyContent: "flex-start" }}
-              >
-                Org A: Member Role (Upload, Query, Read)
-              </button>
-              <button
-                className={`timeline-btn ${token === "viewer-secret-token" ? "btn-primary" : "btn-secondary"}`}
-                onClick={() => handleSaveToken("viewer-secret-token")}
-                style={{ textAlign: "left", justifyContent: "flex-start" }}
-              >
-                Org A: Viewer Role (Read-only)
-              </button>
-
-              <div style={{ fontSize: "0.8rem", fontWeight: 600, color: "#10b981", marginTop: "0.6rem" }}>
-                ORGANIZATION B (BetaCorp Tenant - org_beta)
-              </div>
-              <button
-                className={`timeline-btn ${token === "admin-beta-token" ? "btn-primary" : "btn-secondary"}`}
-                onClick={() => handleSaveToken("admin-beta-token")}
-                style={{ textAlign: "left", justifyContent: "flex-start" }}
-              >
-                Org B: Admin Role (BetaCorp Workspace)
-              </button>
-              <button
-                className={`timeline-btn ${token === "member-beta-token" ? "btn-primary" : "btn-secondary"}`}
-                onClick={() => handleSaveToken("member-beta-token")}
-                style={{ textAlign: "left", justifyContent: "flex-start" }}
-              >
-                Org B: Member Role (BetaCorp Workspace)
-              </button>
-
-              <div style={{ fontSize: "0.8rem", fontWeight: 600, color: "#ef4444", marginTop: "0.6rem" }}>
-                UNAUTHENTICATED / ANONYMOUS
-              </div>
-              <button
-                className={`timeline-btn ${!token ? "btn-primary" : "btn-secondary"}`}
-                onClick={() => handleSaveToken("")}
-                style={{ textAlign: "left", justifyContent: "flex-start" }}
-              >
-                Anonymous (Unauthorized 401)
-              </button>
-            </div>
-            
-            <div style={{ marginTop: "1.5rem" }}>
-              <label style={{ fontSize: "0.85rem", display: "block", marginBottom: "0.4rem" }}>Active Header Token:</label>
-              <input
-                type="text"
-                className="filter-input"
-                style={{ width: "100%", fontFamily: "monospace" }}
-                value={token}
-                onChange={(e) => handleSaveToken(e.target.value)}
-                placeholder="No token set"
-              />
-            </div>
-          </div>
+    <div>
+      <header className="page-header">
+        <div>
+          <h1 className="page-title">System settings</h1>
+          <p className="page-subtitle">Your account, connectors, data retention and the audit log.</p>
         </div>
+      </header>
 
-        {/* Connectors Sync Status Panel */}
-        <div className="timeline-card">
-          <div className="card-header" style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-            <RefreshCw className="text-primary" size={20} />
-            <h2>External Connectors Sync status</h2>
-          </div>
-          <div className="card-content" style={{ marginTop: "1rem" }}>
-            {loadingConnectors && <Spinner message="Querying connectors..." />}
-            {connectorError && (
-              <div style={{ color: "#ef4444", display: "flex", gap: "0.5rem", alignItems: "center", marginBottom: "1rem" }}>
-                <ShieldAlert size={18} />
-                <span>{connectorError}</span>
-              </div>
-            )}
-            
-            <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-              {connectors.map((c) => (
-                <div
-                  key={c.provider}
-                  style={{
-                    padding: "1rem",
-                    borderRadius: "8px",
-                    background: "rgba(255,255,255,0.02)",
-                    border: "1px solid rgba(255,255,255,0.05)",
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center"
-                  }}
-                >
-                  <div>
-                    <h3 style={{ textTransform: "capitalize", fontSize: "1.1rem" }}>{c.provider.replace("_", " ")}</h3>
-                    <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.4rem", fontSize: "0.8rem" }}>
-                      <span style={{ color: c.enabled ? "#10b981" : "#6b7280" }}>
-                        {c.enabled ? "● Enabled" : "○ Disabled"}
-                      </span>
-                      <span style={{ color: "#6b7280" }}>|</span>
-                      <span style={{ color: c.configured ? "#10b981" : "#ef4444" }}>
-                        {c.configured ? "Configured" : "Not Configured"}
-                      </span>
-                      <span style={{ color: "#6b7280" }}>|</span>
-                      <span style={{ color: c.authenticated ? "#10b981" : "#ef4444" }}>
-                        {c.authenticated ? "Authenticated" : "Not Authenticated"}
-                      </span>
-                    </div>
-                  </div>
-                  
-                  <button
-                    className="timeline-btn btn-primary"
-                    disabled={!c.configured || syncingProvider !== null}
-                    onClick={() => handleTriggerSync(c.provider)}
-                    style={{ fontSize: "0.85rem", padding: "0.4rem 0.8rem" }}
-                  >
-                    {syncingProvider === c.provider ? "Syncing..." : "Sync Now"}
+      <div className="grid-2">
+        <section className="card">
+          <h2 className="card-title with-icon">
+            <KeyRound size={18} aria-hidden="true" /> Account
+          </h2>
+          {accountMessage && <Notice tone="error">{accountMessage}</Notice>}
+          <dl className="stat-list">
+            <div><dt>Signed in as</dt><dd>{profile?.full_name || profile?.email || profile?.user_id}</dd></div>
+            <div><dt>Organization</dt><dd>{profile?.organization_name || profile?.org_id}</dd></div>
+            <div><dt>Role</dt><dd>{humanize(profile?.role)}</dd></div>
+          </dl>
+
+          {profile && profile.organizations.length > 1 && (
+            <div className="form-group" style={{ marginTop: 16 }}>
+              <label className="form-label" htmlFor={`${ids}-org`}>Switch organization</label>
+              <select
+                id={`${ids}-org`}
+                className="form-select"
+                value={profile.org_id}
+                onChange={(e) => void switchTo(() => switchOrganization(e.target.value))}
+              >
+                {profile.organizations.map((o) => (
+                  <option key={o.id} value={o.id}>
+                    {o.name} ({o.role})
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {authConfig?.dev_auth_enabled && (
+            <div className="dev-signin">
+              <p className="form-label">Development personas (development mode only)</p>
+              <div className="dev-persona-list">
+                {authConfig.dev_personas.map((p) => (
+                  <button key={p.token} type="button" className="btn btn-secondary" onClick={() => void switchTo(() => signInWithToken(p.token))}>
+                    {p.label}
                   </button>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
+          )}
+        </section>
 
-            {syncMessage && (
-              <div style={{ marginTop: "1rem", padding: "0.8rem", borderRadius: "6px", background: "rgba(255,255,255,0.05)", fontSize: "0.85rem" }}>
-                {syncMessage}
-              </div>
-            )}
-          </div>
-        </div>
+        <section className="card">
+          <h2 className="card-title with-icon">
+            <RefreshCw size={18} aria-hidden="true" /> Meeting connectors
+          </h2>
+          {loadingConnectors && <Spinner message="Checking connectors..." />}
+          {connectorError && <Notice tone="error">{connectorError}</Notice>}
+          {syncMessage && (
+            <Notice tone={syncMessage.tone} onDismiss={() => setSyncMessage(null)}>
+              {syncMessage.text}
+            </Notice>
+          )}
+          <ul className="connector-list">
+            {connectors.map((c) => {
+              const canSync = c.enabled && c.authenticated && hasPermission("connectors.manage")
+              return (
+                <li key={c.provider} className="connector-item">
+                  <div>
+                    <h3 className="connector-name">{humanize(c.provider)}</h3>
+                    <p className="connector-state">
+                      <span className={c.enabled ? "text-success" : "muted"}>{c.enabled ? "Enabled" : "Disabled"}</span>
+                      {" · "}
+                      <span className={c.configured ? "text-success" : "muted"}>{c.configured ? "Credentials set" : "No credentials"}</span>
+                      {" · "}
+                      <span className={c.authenticated ? "text-success" : "muted"}>
+                        {c.authenticated ? (c.demo_mode ? "Demo mode" : "Connected") : "Not connected"}
+                      </span>
+                    </p>
+                    {c.last_error && <p className="muted small">{c.last_error}</p>}
+                  </div>
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    disabled={!canSync || syncing !== null}
+                    title={canSync ? undefined : "Enable the connector and configure working credentials first"}
+                    onClick={() => void handleSync(c.provider)}
+                  >
+                    {syncing === c.provider ? "Syncing…" : "Sync now"}
+                  </button>
+                </li>
+              )
+            })}
+          </ul>
+        </section>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "2rem" }}>
-        {/* Retention Policy Panel */}
-        <div className="timeline-card">
-          <div className="card-header" style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-            <Trash2 className="text-primary" size={20} />
-            <h2>Retention Policies Cleanup</h2>
-          </div>
-          <div className="card-content" style={{ marginTop: "1rem" }}>
-            <p style={{ fontSize: "0.9rem", color: "var(--text-secondary)", marginBottom: "1.5rem" }}>
-              Configure and run transient data pruning cycles. (Admin required)
+      {isAdmin && (
+        <div className="grid-2" style={{ marginTop: 24 }}>
+          <section className="card">
+            <h2 className="card-title with-icon">
+              <Trash2 size={18} aria-hidden="true" /> Data retention cleanup
+            </h2>
+            <p className="muted small" style={{ marginBottom: 16 }}>
+              Applies to <strong>{profile?.organization_name || profile?.org_id}</strong> only. Leave a field empty to skip it.
             </p>
-            <form onSubmit={handleRunRetention} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
-                <div>
-                  <label style={{ display: "block", fontSize: "0.8rem", marginBottom: "0.3rem" }}>Meetings Max Age (days):</label>
-                  <input
-                    type="number"
-                    className="filter-input"
-                    value={meetingDays}
-                    onChange={(e) => setMeetingDays(parseInt(e.target.value) || 0)}
-                    style={{ width: "100%" }}
-                  />
-                </div>
-                <div>
-                  <label style={{ display: "block", fontSize: "0.8rem", marginBottom: "0.3rem" }}>Transcripts Max Age (days):</label>
-                  <input
-                    type="number"
-                    className="filter-input"
-                    value={transcriptDays}
-                    onChange={(e) => setTranscriptDays(parseInt(e.target.value) || 0)}
-                    style={{ width: "100%" }}
-                  />
-                </div>
-                <div>
-                  <label style={{ display: "block", fontSize: "0.8rem", marginBottom: "0.3rem" }}>Evidence Max Age (days):</label>
-                  <input
-                    type="number"
-                    className="filter-input"
-                    value={evidenceDays}
-                    onChange={(e) => setEvidenceDays(parseInt(e.target.value) || 0)}
-                    style={{ width: "100%" }}
-                  />
-                </div>
-                <div>
-                  <label style={{ display: "block", fontSize: "0.8rem", marginBottom: "0.3rem" }}>Audit Logs Max Age (days):</label>
-                  <input
-                    type="number"
-                    className="filter-input"
-                    value={auditDays}
-                    onChange={(e) => setAuditDays(parseInt(e.target.value) || 0)}
-                    style={{ width: "100%" }}
-                  />
-                </div>
+            <form onSubmit={handleRetention}>
+              <div className="grid-2">
+                {RETENTION_FIELDS.map(({ key, label }) => (
+                  <div key={key} className="form-group">
+                    <label className="form-label" htmlFor={`${ids}-${key}`}>{label}</label>
+                    <input
+                      id={`${ids}-${key}`}
+                      type="number"
+                      min={1}
+                      className="form-input"
+                      value={retention[key]}
+                      onChange={(e) => setRetention((r) => ({ ...r, [key]: e.target.value }))}
+                    />
+                  </div>
+                ))}
               </div>
-
-              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "0.5rem" }}>
-                <input
-                  type="checkbox"
-                  id="dryRun"
-                  checked={dryRun}
-                  onChange={(e) => setDryRun(e.target.checked)}
-                />
-                <label htmlFor="dryRun" style={{ fontSize: "0.9rem", cursor: "pointer" }}>
-                  Dry Run (List items to delete without actually deleting them)
-                </label>
+              <div className="checkbox-row">
+                <input type="checkbox" id={`${ids}-dry`} checked={dryRun} onChange={(e) => setDryRun(e.target.checked)} />
+                <label htmlFor={`${ids}-dry`}>Preview only (count what would be deleted)</label>
               </div>
-
-              <button
-                type="submit"
-                className="timeline-btn btn-danger"
-                disabled={purging}
-                style={{ width: "100%", marginTop: "1rem" }}
-              >
-                {purging ? "Purging records..." : "Trigger Retention Purge"}
-              </button>
+              {purgeError && <Notice tone="error">{purgeError}</Notice>}
+              <div className="form-actions">
+                <button type="submit" className={`btn ${dryRun ? "btn-outline" : "btn-danger"}`} disabled={purging}>
+                  {purging ? "Working…" : dryRun ? "Preview cleanup" : "Delete permanently"}
+                </button>
+              </div>
             </form>
-
-            {purgeError && (
-              <div style={{ color: "#ef4444", marginTop: "1rem", fontSize: "0.85rem", display: "flex", gap: "0.5rem", alignItems: "center" }}>
-                <ShieldAlert size={16} />
-                <span>{purgeError}</span>
-              </div>
-            )}
-
             {purgeResult && (
-              <div style={{ marginTop: "1rem", padding: "1rem", borderRadius: "6px", background: "rgba(255,255,255,0.05)", fontSize: "0.85rem" }}>
-                <h4 style={{ marginBottom: "0.5rem", fontWeight: "bold" }}>
-                  Status: {purgeResult.status.toUpperCase()}
-                </h4>
-                <ul style={{ paddingLeft: "1.2rem", listStyleType: "disc" }}>
-                  <li>Meetings matching: {purgeResult.deleted?.meetings_deleted || 0}</li>
-                  <li>Segments matching: {purgeResult.deleted?.transcripts_deleted || 0}</li>
-                  <li>Evidence matching: {purgeResult.deleted?.evidence_deleted || 0}</li>
-                  <li>Audit Logs matching: {purgeResult.deleted?.audit_logs_deleted || 0}</li>
-                </ul>
-              </div>
+              <Notice tone={purgeResult.dry_run ? "info" : "success"}>
+                <strong>{purgeResult.dry_run ? "Would delete:" : "Deleted:"}</strong>{" "}
+                {Object.entries(purgeResult.deleted)
+                  .map(([k, v]) => `${v} ${humanize(k.replace("_deleted", ""))}`)
+                  .join(", ")}
+              </Notice>
             )}
-          </div>
-        </div>
+          </section>
 
-        {/* Audit Log Table Panel */}
-        <div className="timeline-card">
-          <div className="card-header" style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-            <ShieldAlert className="text-primary" size={20} />
-            <h2>Security Audit Logs</h2>
-          </div>
-          <div className="card-content" style={{ marginTop: "1rem" }}>
+          <section className="card">
+            <h2 className="card-title with-icon">
+              <ShieldAlert size={18} aria-hidden="true" /> Audit log
+            </h2>
             {loadingLogs && <Spinner message="Loading audit logs..." />}
-            {logError && (
-              <div style={{ color: "#ef4444", display: "flex", gap: "0.5rem", alignItems: "center" }}>
-                <Info size={18} />
-                <span>{logError}</span>
-              </div>
-            )}
-            
-            {!loadingLogs && !logError && (
-              <div style={{ maxHeight: "300px", overflowY: "auto" }}>
-                {auditLogs.length === 0 ? (
-                  <p style={{ color: "var(--text-secondary)", fontSize: "0.9rem" }}>No audit log entries found.</p>
-                ) : (
-                  <table style={{ width: "100%", fontSize: "0.8rem", borderCollapse: "collapse" }}>
-                    <thead>
-                      <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.1)", textAlign: "left" }}>
-                        <th style={{ padding: "0.4rem" }}>Time</th>
-                        <th style={{ padding: "0.4rem" }}>Actor</th>
-                        <th style={{ padding: "0.4rem" }}>Action</th>
-                        <th style={{ padding: "0.4rem" }}>Outcome</th>
+            {auditError && <Notice tone="error">{auditError}</Notice>}
+            {!loadingLogs && !auditError && auditLogs.length === 0 && <p className="muted">No audit entries yet.</p>}
+            {auditLogs.length > 0 && (
+              <div className="table-container scroll-y">
+                <table className="table compact-table">
+                  <thead>
+                    <tr>
+                      <th scope="col">When</th>
+                      <th scope="col">Who</th>
+                      <th scope="col">Action</th>
+                      <th scope="col">Outcome</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {auditLogs.map((log) => (
+                      <tr key={log.id}>
+                        <td>{formatDateTime(log.timestamp)}</td>
+                        <td>{log.actor_id}</td>
+                        <td><code>{log.action}</code></td>
+                        <td className={log.outcome === "succeeded" ? "text-success" : "text-danger"}>{log.outcome}</td>
                       </tr>
-                    </thead>
-                    <tbody>
-                      {auditLogs.map((log) => (
-                        <tr key={log.id} style={{ borderBottom: "1px solid rgba(255,255,255,0.03)" }}>
-                          <td style={{ padding: "0.4rem", color: "var(--text-secondary)" }}>
-                            {new Date(log.timestamp).toLocaleTimeString()}
-                          </td>
-                          <td style={{ padding: "0.4rem" }}>{log.actor_id}</td>
-                          <td style={{ padding: "0.4rem", fontFamily: "monospace" }}>{log.action}</td>
-                          <td style={{ padding: "0.4rem", color: log.outcome === "succeeded" ? "#10b981" : "#ef4444" }}>
-                            {log.outcome}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
+                    ))}
+                  </tbody>
+                </table>
               </div>
             )}
-          </div>
+          </section>
         </div>
-      </div>
+      )}
     </div>
   )
 }
-
 export default Settings
-

@@ -175,12 +175,15 @@ SYNONYMS: dict[str, list[str]] = {
 
 
 class HybridSearchEngine:
-    """Multi-channel hybrid search engine combining Lexical Search, Vector Embeddings, and Graph Relationships.
+    """Multi-channel hybrid search engine combining lexical search, vector embeddings and facts.
 
     Must be instantiated with the authenticated user's ``org_id`` so all queries
     are scoped to a single tenant.  Tenants cannot retrieve each other's meetings,
-    transcripts, decisions, or embeddings.
+    transcripts, decisions, or embeddings. Soft-deleted meetings are never returned.
     """
+
+    # Minimum cosine similarity for a transcript segment to match on meaning alone
+    SEMANTIC_MATCH_THRESHOLD = 0.45
 
     def __init__(
         self,
@@ -193,6 +196,21 @@ class HybridSearchEngine:
         self.session = session
         self.org_id = org_id
         self.embedder = embedder or MockEmbedder()
+        # The mock embedder produces arbitrary vectors; never let it match on its own
+        self.semantic_matching = not isinstance(self.embedder, MockEmbedder)
+
+    @staticmethod
+    def _evidence(
+        meeting_id: str, seg: TranscriptSegmentModel, m_info: MeetingModel
+    ) -> EvidenceItem:
+        return EvidenceItem(
+            meeting_id=meeting_id,
+            segment_id=seg.id,
+            start_time=seg.start_time,
+            end_time=seg.end_time,
+            text_snapshot=seg.text,
+            source_type=SourceType(m_info.source_type),
+        )
 
     async def search(
         self,
@@ -217,12 +235,16 @@ class HybridSearchEngine:
             else:
                 query_terms.append(w)
 
-        query_embeddings = await self.embedder.embed([query_clean])
-        q_vec = query_embeddings[0] if query_embeddings else []
+        q_vec: list[float] = []
+        if query_clean:
+            query_embeddings = await self.embedder.embed([query_clean])
+            q_vec = query_embeddings[0] if query_embeddings else []
 
         candidates: list[SearchCandidate] = []
 
-        m_stmt = select(MeetingModel).where(MeetingModel.org_id == self.org_id)
+        m_stmt = select(MeetingModel).where(
+            MeetingModel.org_id == self.org_id, MeetingModel.deleted_at.is_(None)
+        )
         if meeting_id:
             m_stmt = m_stmt.where(MeetingModel.id == meeting_id)
         if start_date:
@@ -233,8 +255,11 @@ class HybridSearchEngine:
         meetings_result = await self.session.execute(m_stmt)
         valid_meetings = {m.id: m for m in meetings_result.scalars().all()}
 
-        if topic:
-            top_stmt = select(TopicModel.meeting_id).where(TopicModel.name.ilike(f"%{topic}%"))
+        if topic and valid_meetings:
+            top_stmt = select(TopicModel.meeting_id).where(
+                TopicModel.name.ilike(f"%{topic}%"),
+                TopicModel.meeting_id.in_(list(valid_meetings.keys())),
+            )
             topic_meeting_ids = set((await self.session.execute(top_stmt)).scalars().all())
             title_matching_ids = {
                 mid for mid, m in valid_meetings.items() if topic.lower() in m.title.lower()
@@ -250,20 +275,20 @@ class HybridSearchEngine:
         if not valid_meeting_ids:
             return SearchResponse(query=query, total_results=0, results=[])
 
-        all_seg_map: dict[str, TranscriptSegmentModel] = {}
-        if result_type in (None, "all", "transcript"):
-            seg_stmt = select(TranscriptSegmentModel).where(
-                TranscriptSegmentModel.meeting_id.in_(valid_meeting_ids)
-            )
-            seg_rows = (await self.session.execute(seg_stmt)).scalars().all()
-            all_seg_map = {s.id: s for s in seg_rows}
+        # Transcript segments are needed both for transcript results and for the timestamps /
+        # evidence of decision, action and issue results.
+        seg_stmt = select(TranscriptSegmentModel).where(
+            TranscriptSegmentModel.meeting_id.in_(valid_meeting_ids)
+        )
+        seg_rows = (await self.session.execute(seg_stmt)).scalars().all()
+        all_seg_map: dict[str, TranscriptSegmentModel] = {s.id: s for s in seg_rows}
 
-            emb_stmt = select(EmbeddingModel).where(
+        if result_type in (None, "all", "transcript"):
+            emb_stmt = select(EmbeddingModel.source_id, EmbeddingModel.embedding_json).where(
                 EmbeddingModel.meeting_id.in_(valid_meeting_ids),
                 EmbeddingModel.source_type == "segment",
             )
-            emb_rows = (await self.session.execute(emb_stmt)).scalars().all()
-            emb_map = {e.source_id: e.embedding_json for e in emb_rows}
+            emb_map = dict((await self.session.execute(emb_stmt)).tuples().all())
 
             for seg in seg_rows:
                 m_info = valid_meetings[seg.meeting_id]
@@ -281,24 +306,16 @@ class HybridSearchEngine:
                 if seg.id in emb_map and q_vec:
                     vector_score = cosine_similarity(q_vec, emb_map[seg.id])
 
-                is_match = False
                 fused_score = 0.0
                 if not query_clean:
-                    is_match = True
                     fused_score = 1.0
                 elif lexical_score > 0.0:
-                    is_match = True
                     fused_score = 0.7 * lexical_score + 0.3 * vector_score
+                elif self.semantic_matching and vector_score >= self.SEMANTIC_MATCH_THRESHOLD:
+                    # Related wording without a shared keyword
+                    fused_score = 0.5 * vector_score
 
-                if is_match:
-                    evidence = EvidenceItem(
-                        meeting_id=seg.meeting_id,
-                        segment_id=seg.id,
-                        start_time=seg.start_time,
-                        end_time=seg.end_time,
-                        text_snapshot=seg.text,
-                        source_type=SourceType(m_info.source_type),
-                    )
+                if fused_score > 0.0:
                     candidates.append(
                         SearchCandidate(
                             id=f"cand-{seg.id}",
@@ -311,48 +328,65 @@ class HybridSearchEngine:
                             text=seg.text,
                             source_type="transcript",
                             score=round(fused_score, 4),
-                            evidence=evidence,
+                            evidence=self._evidence(seg.meeting_id, seg, m_info),
                         )
                     )
 
+        def fact_score(text: str) -> float:
+            lowered = text.lower()
+            if query_clean.lower() in lowered and len(query_clean) > 3:
+                return 0.95
+            if query_terms and any(t in lowered for t in query_terms):
+                return 0.85
+            if not query_clean:
+                return 0.50
+            return 0.0
+
+        def fact_candidate(
+            fact_id: str,
+            fact_meeting_id: str,
+            evidence_segment_id: str | None,
+            text: str,
+            kind: str,
+            score: float,
+        ) -> SearchCandidate:
+            m_info = valid_meetings[fact_meeting_id]
+            seg = all_seg_map.get(evidence_segment_id or "")
+            return SearchCandidate(
+                id=f"cand-{fact_id}",
+                meeting_id=fact_meeting_id,
+                meeting_title=m_info.title,
+                meeting_date=m_info.meeting_date,
+                segment_id=evidence_segment_id,
+                start_time=seg.start_time if seg else None,
+                end_time=seg.end_time if seg else None,
+                text=text,
+                source_type=kind,
+                score=round(score, 4),
+                evidence=self._evidence(fact_meeting_id, seg, m_info) if seg else None,
+            )
+
         if result_type in (None, "all", "decision"):
-            dec_stmt = select(DecisionModel).where(DecisionModel.meeting_id.in_(valid_meeting_ids))
-            dec_rows = (await self.session.execute(dec_stmt)).scalars().all()
-
+            dec_rows = (
+                (
+                    await self.session.execute(
+                        select(DecisionModel).where(DecisionModel.meeting_id.in_(valid_meeting_ids))
+                    )
+                )
+                .scalars()
+                .all()
+            )
             for dec in dec_rows:
-                m_info = valid_meetings[dec.meeting_id]
-                sub_lowered = dec.subject.lower()
-                score = 0.0
-                if query_clean.lower() in sub_lowered and len(query_clean) > 3:
-                    score = 0.95
-                elif query_terms and any(t in sub_lowered for t in query_terms):
-                    score = 0.85
-                elif not query_clean:
-                    score = 0.50
-
+                score = fact_score(dec.subject)
                 if score > 0.0:
-                    ev: EvidenceItem | None = None
-                    if dec.evidence_segment_id and dec.evidence_segment_id in all_seg_map:
-                        seg = all_seg_map[dec.evidence_segment_id]
-                        ev = EvidenceItem(
-                            meeting_id=dec.meeting_id,
-                            segment_id=seg.id,
-                            start_time=seg.start_time,
-                            end_time=seg.end_time,
-                            text_snapshot=seg.text,
-                            source_type=SourceType(m_info.source_type),
-                        )
                     candidates.append(
-                        SearchCandidate(
-                            id=f"cand-{dec.id}",
-                            meeting_id=dec.meeting_id,
-                            meeting_title=m_info.title,
-                            meeting_date=m_info.meeting_date,
-                            segment_id=dec.evidence_segment_id,
-                            text=f"Decision: {dec.subject} (Status: {dec.status})",
-                            source_type="decision",
-                            score=round(score, 4),
-                            evidence=ev,
+                        fact_candidate(
+                            dec.id,
+                            dec.meeting_id,
+                            dec.evidence_segment_id,
+                            f"Decision: {dec.subject} (Status: {dec.status})",
+                            "decision",
+                            score,
                         )
                     )
 
@@ -362,83 +396,41 @@ class HybridSearchEngine:
             )
             if person:
                 com_stmt = com_stmt.where(CommitmentModel.owner_id.ilike(f"%{person}%"))
-            com_rows = (await self.session.execute(com_stmt)).scalars().all()
-
-            for com in com_rows:
-                m_info = valid_meetings[com.meeting_id]
-                desc_lowered = com.description.lower()
-                score = 0.0
-                if query_clean.lower() in desc_lowered and len(query_clean) > 3:
-                    score = 0.95
-                elif query_terms and any(t in desc_lowered for t in query_terms):
-                    score = 0.85
-                elif not query_clean:
-                    score = 0.50
-
+            for com in (await self.session.execute(com_stmt)).scalars().all():
+                score = fact_score(com.description)
                 if score > 0.0:
-                    ev: EvidenceItem | None = None
-                    if com.evidence_segment_id and com.evidence_segment_id in all_seg_map:
-                        seg = all_seg_map[com.evidence_segment_id]
-                        ev = EvidenceItem(
-                            meeting_id=com.meeting_id,
-                            segment_id=seg.id,
-                            start_time=seg.start_time,
-                            end_time=seg.end_time,
-                            text_snapshot=seg.text,
-                            source_type=SourceType(m_info.source_type),
-                        )
                     candidates.append(
-                        SearchCandidate(
-                            id=f"cand-{com.id}",
-                            meeting_id=com.meeting_id,
-                            meeting_title=m_info.title,
-                            meeting_date=m_info.meeting_date,
-                            segment_id=com.evidence_segment_id,
-                            text=f"Action: {com.description} (Owner: {com.owner_id}, Status: {com.status})",
-                            source_type="action",
-                            score=round(score, 4),
-                            evidence=ev,
+                        fact_candidate(
+                            com.id,
+                            com.meeting_id,
+                            com.evidence_segment_id,
+                            f"Action: {com.description} (Owner: {com.owner_id}, Status: {com.status})",
+                            "action",
+                            score,
                         )
                     )
 
         if result_type in (None, "all", "issue"):
-            iss_stmt = select(IssueModel).where(IssueModel.meeting_id.in_(valid_meeting_ids))
-            iss_rows = (await self.session.execute(iss_stmt)).scalars().all()
-
+            iss_rows = (
+                (
+                    await self.session.execute(
+                        select(IssueModel).where(IssueModel.meeting_id.in_(valid_meeting_ids))
+                    )
+                )
+                .scalars()
+                .all()
+            )
             for iss in iss_rows:
-                m_info = valid_meetings[iss.meeting_id]
-                desc_lowered = iss.description.lower()
-                score = 0.0
-                if query_clean.lower() in desc_lowered and len(query_clean) > 3:
-                    score = 0.95
-                elif query_terms and any(t in desc_lowered for t in query_terms):
-                    score = 0.85
-                elif not query_clean:
-                    score = 0.50
-
+                score = fact_score(iss.description)
                 if score > 0.0:
-                    ev: EvidenceItem | None = None
-                    if iss.evidence_segment_id and iss.evidence_segment_id in all_seg_map:
-                        seg = all_seg_map[iss.evidence_segment_id]
-                        ev = EvidenceItem(
-                            meeting_id=iss.meeting_id,
-                            segment_id=seg.id,
-                            start_time=seg.start_time,
-                            end_time=seg.end_time,
-                            text_snapshot=seg.text,
-                            source_type=SourceType(m_info.source_type),
-                        )
                     candidates.append(
-                        SearchCandidate(
-                            id=f"cand-{iss.id}",
-                            meeting_id=iss.meeting_id,
-                            meeting_title=m_info.title,
-                            meeting_date=m_info.meeting_date,
-                            segment_id=iss.evidence_segment_id,
-                            text=f"Issue: {iss.description} (Status: {iss.status})",
-                            source_type="issue",
-                            score=round(score, 4),
-                            evidence=ev,
+                        fact_candidate(
+                            iss.id,
+                            iss.meeting_id,
+                            iss.evidence_segment_id,
+                            f"Issue: {iss.description} (Status: {iss.status})",
+                            "issue",
+                            score,
                         )
                     )
 

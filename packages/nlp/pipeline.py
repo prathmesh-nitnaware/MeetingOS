@@ -1,6 +1,6 @@
 import logging
 from datetime import UTC, datetime
-from uuid import uuid4
+from uuid import NAMESPACE_URL, uuid4, uuid5
 
 from packages.common.enums import UtteranceClass
 from packages.common.models import (
@@ -182,6 +182,25 @@ class NLPExtractionPipeline:
             segments, classes_map, meeting_date=ref_date, meeting_id=meeting_id
         )
         topics = FactExtractors.extract_topics(segments, unique_entities)
+
+        # 6. Link lifecycle events to the facts extracted from the same segment and give them
+        #    deterministic IDs, so the UI can open a decision/commitment/issue history from an
+        #    event and re-running extraction does not multiply events.
+        decision_by_segment = {d.evidence_segment_id: d.decision_id for d in decisions}
+        commitment_by_segment = {c.evidence_segment_id: c.commitment_id for c in commitments}
+        issue_by_segment = {i.evidence_segment_id: i.issue_id for i in issues}
+        for evt in all_events:
+            event_type = str(evt.event_type)
+            seg_key = evt.evidence_segment_id
+            if event_type.startswith("DECISION_") and seg_key in decision_by_segment:
+                evt.payload["decision_id"] = decision_by_segment[seg_key]
+            elif (
+                event_type.startswith("COMMITMENT_") or event_type == "DEADLINE_CHANGED"
+            ) and seg_key in commitment_by_segment:
+                evt.payload["commitment_id"] = commitment_by_segment[seg_key]
+            elif event_type.startswith("ISSUE_") and seg_key in issue_by_segment:
+                evt.payload["issue_id"] = issue_by_segment[seg_key]
+            evt.event_id = f"evt-{uuid5(NAMESPACE_URL, f'nlp:{meeting_id}:{seg_key}:{event_type}')}"
 
         result = NLPExtractionResult(
             meeting_id=meeting_id,

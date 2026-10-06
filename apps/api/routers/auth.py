@@ -1,11 +1,19 @@
 import hashlib
+import re
 import secrets
 import uuid
-from datetime import UTC, datetime, timedelta
+from datetime import UTC
 from typing import Any
 
-from apps.api.auth import UserIdentity, create_access_token, get_current_user, require_viewer
+from apps.api.auth import (
+    DEV_TOKENS,
+    ROLE_PERMISSIONS,
+    UserIdentity,
+    create_access_token,
+    get_current_user,
+)
 from apps.api.config import settings
+from apps.api.rate_limiter import rate_limit
 from fastapi import APIRouter, Depends, HTTPException, status
 from packages.memory.database import get_db_session
 from packages.memory.models import (
@@ -16,15 +24,37 @@ from packages.memory.models import (
     UserModel,
     utc_now,
 )
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import select
 
 router = APIRouter(prefix="/auth", tags=["Authentication & Multi-Tenancy"])
 
+EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+SLUG_RE = re.compile(r"^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$")
+MIN_PASSWORD_LENGTH = 8
+PBKDF2_ITERATIONS = 600_000
+LEGACY_PBKDF2_ITERATIONS = 100_000
+INVALID_CREDENTIALS = "Invalid email or password."
+
+auth_rate_limit = rate_limit("auth", lambda: settings.rate_limit_login_per_min)
+
+
+def _validate_email(value: str) -> str:
+    cleaned = value.strip().lower()
+    if not EMAIL_RE.match(cleaned):
+        raise ValueError("Enter a valid email address.")
+    return cleaned
+
+
+def _validate_new_password(value: str | None) -> str | None:
+    if value is not None and len(value) < MIN_PASSWORD_LENGTH:
+        raise ValueError(f"Password must be at least {MIN_PASSWORD_LENGTH} characters long.")
+    return value
+
 
 class LoginRequest(BaseModel):
     email: str
-    password: str | None = None
+    password: str = ""
     org_slug: str | None = None
 
 
@@ -37,12 +67,22 @@ class LoginResponse(BaseModel):
 
 
 class RegisterOrgRequest(BaseModel):
-    org_name: str
+    org_name: str = Field(min_length=1, max_length=255)
     org_slug: str
-    admin_name: str
+    admin_name: str = Field(min_length=1, max_length=255)
     admin_email: str
     admin_password: str | None = None
     allowed_domains: list[str] | None = None
+
+    @field_validator("admin_email")
+    @classmethod
+    def check_email(cls, value: str) -> str:
+        return _validate_email(value)
+
+    @field_validator("admin_password")
+    @classmethod
+    def check_password(cls, value: str | None) -> str | None:
+        return _validate_new_password(value)
 
 
 class SwitchOrgRequest(BaseModel):
@@ -53,6 +93,11 @@ class AcceptInvitationRequest(BaseModel):
     token: str
     full_name: str | None = None
     password: str | None = None
+
+    @field_validator("password")
+    @classmethod
+    def check_password(cls, value: str | None) -> str | None:
+        return _validate_new_password(value)
 
 
 class CurrentUserResponse(BaseModel):
@@ -67,66 +112,111 @@ class CurrentUserResponse(BaseModel):
     organizations: list[dict[str, Any]] = []
 
 
+class DevPersona(BaseModel):
+    token: str
+    label: str
+    org_id: str
+    role: str
+
+
+class AuthConfigResponse(BaseModel):
+    dev_auth_enabled: bool
+    dev_personas: list[DevPersona] = []
+
+
 def hash_password(password: str) -> str:
-    """Hash password using PBKDF2-HMAC-SHA256 with cryptographically secure random salt."""
+    """Hash password using PBKDF2-HMAC-SHA256 with a random salt (iterations stored in the hash)."""
     salt = secrets.token_hex(16)
-    key = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt.encode("utf-8"), 100000)
-    return f"pbkdf2_sha256${salt}${key.hex()}"
+    key = hashlib.pbkdf2_hmac(
+        "sha256", password.encode("utf-8"), salt.encode("utf-8"), PBKDF2_ITERATIONS
+    )
+    return f"pbkdf2_sha256${PBKDF2_ITERATIONS}${salt}${key.hex()}"
 
 
 def verify_password(plain_password: str, hashed_password: str | None) -> bool:
-    """Verify password against stored PBKDF2 salt hash or fallback legacy hash."""
+    """Verify a password against a stored PBKDF2 hash (current or older formats)."""
     if not hashed_password or not plain_password:
         return False
     if hashed_password.startswith("pbkdf2_sha256$"):
         parts = hashed_password.split("$")
-        if len(parts) != 3:
+        if len(parts) == 4:
+            try:
+                iterations = int(parts[1])
+            except ValueError:
+                return False
+            salt, expected_key_hex = parts[2], parts[3]
+        elif len(parts) == 3:
+            iterations, salt, expected_key_hex = LEGACY_PBKDF2_ITERATIONS, parts[1], parts[2]
+        else:
             return False
-        salt, expected_key_hex = parts[1], parts[2]
-        key = hashlib.pbkdf2_hmac("sha256", plain_password.encode("utf-8"), salt.encode("utf-8"), 100000)
+        key = hashlib.pbkdf2_hmac(
+            "sha256", plain_password.encode("utf-8"), salt.encode("utf-8"), iterations
+        )
         return secrets.compare_digest(key.hex(), expected_key_hex)
-    else:
-        # Legacy fallback comparison
-        legacy_hash = hashlib.sha256(plain_password.encode("utf-8")).hexdigest()
-        return secrets.compare_digest(legacy_hash, hashed_password)
+    # Legacy unsalted SHA-256 hashes from early development builds
+    legacy_hash = hashlib.sha256(plain_password.encode("utf-8")).hexdigest()
+    return secrets.compare_digest(legacy_hash, hashed_password)
 
 
+def _identity(user: UserModel, org_id: str, role: str) -> UserIdentity:
+    return UserIdentity(
+        user_id=user.id,
+        org_id=org_id,
+        role=role,
+        email=user.email,
+        full_name=user.full_name,
+        permissions=sorted(ROLE_PERMISSIONS.get(role, set())),
+    )
 
-@router.post("/login", response_model=LoginResponse)
+
+def _token_response(
+    user: UserModel, org_id: str, role: str, orgs: list[dict[str, Any]]
+) -> LoginResponse:
+    return LoginResponse(
+        access_token=create_access_token(
+            user_id=user.id,
+            org_id=org_id,
+            role=role,
+            email=user.email,
+            full_name=user.full_name,
+        ),
+        expires_in_seconds=settings.access_token_ttl_minutes * 60,
+        user=_identity(user, org_id, role),
+        available_organizations=orgs,
+    )
+
+
+@router.get("/config", response_model=AuthConfigResponse)
+async def get_auth_config() -> AuthConfigResponse:
+    """Public sign-in configuration. Development personas are only listed in dev/test."""
+    if not settings.dev_auth_enabled:
+        return AuthConfigResponse(dev_auth_enabled=False)
+    personas = [
+        DevPersona(
+            token=token,
+            label=f"{identity.full_name} ({identity.role}, {identity.org_id})",
+            org_id=identity.org_id,
+            role=identity.role,
+        )
+        for token, identity in DEV_TOKENS.items()
+    ]
+    return AuthConfigResponse(dev_auth_enabled=True, dev_personas=personas)
+
+
+@router.post("/login", response_model=LoginResponse, dependencies=[Depends(auth_rate_limit)])
 async def login(request: LoginRequest) -> LoginResponse:
-    """Authenticate a user and return a tenant-scoped JWT access token."""
+    """Authenticate a user with email + password and return a tenant-scoped JWT access token."""
     email_clean = request.email.strip().lower()
 
     async with get_db_session(settings.database_url) as session:
-        # 1. Lookup user by email
-        stmt = select(UserModel).where(UserModel.email == email_clean)
-        user_row = (await session.execute(stmt)).scalar_one_or_none()
+        user_row = (
+            await session.execute(select(UserModel).where(UserModel.email == email_clean))
+        ).scalar_one_or_none()
 
-        if not user_row:
-            # Fallback for local development if email matches dev tokens
-            if "admin" in email_clean:
-                token = create_access_token(
-                    user_id="admin-dev",
-                    org_id="org_dev",
-                    role="admin",
-                    email=email_clean,
-                    full_name="Dev Admin",
-                )
-                identity = UserIdentity(
-                    user_id="admin-dev",
-                    org_id="org_dev",
-                    role="admin",
-                    email=email_clean,
-                    full_name="Dev Admin",
-                )
-                return LoginResponse(
-                    access_token=token,
-                    user=identity,
-                    available_organizations=[{"id": "org_dev", "name": "Development Org", "role": "admin"}],
-                )
+        # Same message for unknown users and wrong passwords to avoid account enumeration
+        if not user_row or not verify_password(request.password, user_row.password_hash):
             raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid credentials or user not found.",
+                status_code=status.HTTP_401_UNAUTHORIZED, detail=INVALID_CREDENTIALS
             )
 
         if not user_row.is_active:
@@ -135,15 +225,17 @@ async def login(request: LoginRequest) -> LoginResponse:
                 detail="This user account has been suspended or deactivated.",
             )
 
-        # 2. Fetch user's memberships
-        stmt_mem = select(OrganizationMembershipModel, OrganizationModel).join(
-            OrganizationModel, OrganizationModel.id == OrganizationMembershipModel.org_id
-        ).where(
-            OrganizationMembershipModel.user_id == user_row.id,
-            OrganizationMembershipModel.status == "active",
-            OrganizationModel.status == "active",
-        )
-        membership_rows = (await session.execute(stmt_mem)).all()
+        membership_rows = (
+            await session.execute(
+                select(OrganizationMembershipModel, OrganizationModel)
+                .join(OrganizationModel, OrganizationModel.id == OrganizationMembershipModel.org_id)
+                .where(
+                    OrganizationMembershipModel.user_id == user_row.id,
+                    OrganizationMembershipModel.status == "active",
+                    OrganizationModel.status == "active",
+                )
+            )
+        ).all()
 
         if not membership_rows:
             raise HTTPException(
@@ -151,7 +243,6 @@ async def login(request: LoginRequest) -> LoginResponse:
                 detail="User has no active organization memberships.",
             )
 
-        # 3. Select target organization
         active_mem = None
         if request.org_slug:
             for mem, org in membership_rows:
@@ -160,35 +251,13 @@ async def login(request: LoginRequest) -> LoginResponse:
                     break
         if not active_mem:
             active_mem = membership_rows[0]
-
         target_mem, target_org = active_mem
-
-        token = create_access_token(
-            user_id=user_row.id,
-            org_id=target_org.id,
-            role=target_mem.role,
-            email=user_row.email,
-            full_name=user_row.full_name,
-        )
-
-        identity = UserIdentity(
-            user_id=user_row.id,
-            org_id=target_org.id,
-            role=target_mem.role,
-            email=user_row.email,
-            full_name=user_row.full_name,
-        )
 
         org_list = [
             {"id": org.id, "name": org.name, "slug": org.slug, "role": mem.role}
             for mem, org in membership_rows
         ]
-
-        return LoginResponse(
-            access_token=token,
-            user=identity,
-            available_organizations=org_list,
-        )
+        return _token_response(user_row, target_org.id, target_mem.role, org_list)
 
 
 @router.get("/me", response_model=CurrentUserResponse)
@@ -197,31 +266,32 @@ async def get_current_user_profile(
 ) -> CurrentUserResponse:
     """Retrieve full tenant context, role, permissions, and available organizations."""
     async with get_db_session(settings.database_url) as session:
-        # Fetch organization info
-        stmt_org = select(OrganizationModel).where(OrganizationModel.id == user.org_id)
-        org_row = (await session.execute(stmt_org)).scalar_one_or_none()
-
-        # Fetch other accessible organizations
-        stmt_user = select(UserModel).where(UserModel.id == user.user_id)
-        user_row = (await session.execute(stmt_user)).scalar_one_or_none()
+        org_row = await session.get(OrganizationModel, user.org_id)
+        user_row = await session.get(UserModel, user.user_id)
 
         org_list = []
         if user_row:
-            stmt_mem = select(OrganizationMembershipModel, OrganizationModel).join(
-                OrganizationModel, OrganizationModel.id == OrganizationMembershipModel.org_id
-            ).where(
-                OrganizationMembershipModel.user_id == user_row.id,
-                OrganizationMembershipModel.status == "active",
+            stmt_mem = (
+                select(OrganizationMembershipModel, OrganizationModel)
+                .join(OrganizationModel, OrganizationModel.id == OrganizationMembershipModel.org_id)
+                .where(
+                    OrganizationMembershipModel.user_id == user_row.id,
+                    OrganizationMembershipModel.status == "active",
+                )
             )
             for mem, org in (await session.execute(stmt_mem)).all():
-                org_list.append({"id": org.id, "name": org.name, "slug": org.slug, "role": mem.role})
+                org_list.append(
+                    {"id": org.id, "name": org.name, "slug": org.slug, "role": mem.role}
+                )
         else:
-            org_list.append({
-                "id": user.org_id,
-                "name": org_row.name if org_row else "Current Workspace",
-                "slug": org_row.slug if org_row else user.org_id,
-                "role": user.role,
-            })
+            org_list.append(
+                {
+                    "id": user.org_id,
+                    "name": org_row.name if org_row else "Current Workspace",
+                    "slug": org_row.slug if org_row else user.org_id,
+                    "role": user.role,
+                }
+            )
 
         return CurrentUserResponse(
             user_id=user.user_id,
@@ -236,59 +306,83 @@ async def get_current_user_profile(
         )
 
 
-@router.post("/register-org", response_model=LoginResponse)
+@router.post("/register-org", response_model=LoginResponse, dependencies=[Depends(auth_rate_limit)])
 async def register_organization(request: RegisterOrgRequest) -> LoginResponse:
-    """Create a brand new isolated organization tenant and initial Owner account."""
+    """Create a new isolated organization tenant and its initial Owner account.
+
+    If the email already belongs to an account, the correct password for that account is
+    required; otherwise anyone could obtain a token for someone else's user ID.
+    """
     slug_clean = request.org_slug.strip().lower().replace(" ", "-")
-    email_clean = request.admin_email.strip().lower()
+    if not SLUG_RE.match(slug_clean):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Workspace URL may only contain lowercase letters, digits and hyphens (max 64).",
+        )
+    email_clean = request.admin_email
 
     async with get_db_session(settings.database_url) as session:
-        # Check slug collision
-        stmt_slug = select(OrganizationModel).where(OrganizationModel.slug == slug_clean)
-        existing_org = (await session.execute(stmt_slug)).scalar_one_or_none()
+        existing_org = (
+            await session.execute(
+                select(OrganizationModel).where(OrganizationModel.slug == slug_clean)
+            )
+        ).scalar_one_or_none()
         if existing_org:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail=f"An organization with workspace URL slug '{slug_clean}' already exists.",
             )
 
-        org_id = f"org_{uuid.uuid4().hex[:12]}"
+        user = (
+            await session.execute(select(UserModel).where(UserModel.email == email_clean))
+        ).scalar_one_or_none()
+        if user:
+            if not request.admin_password or not verify_password(
+                request.admin_password, user.password_hash
+            ):
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="An account with this email already exists. Enter that account's password to create another organization.",
+                )
+            if not user.is_active:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="This user account has been suspended or deactivated.",
+                )
+        else:
+            if not request.admin_password:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=f"A password of at least {MIN_PASSWORD_LENGTH} characters is required.",
+                )
+            user = UserModel(
+                id=str(uuid.uuid4()),
+                email=email_clean,
+                full_name=request.admin_name.strip(),
+                password_hash=hash_password(request.admin_password),
+                is_active=True,
+            )
+            session.add(user)
+
         org = OrganizationModel(
-            id=org_id,
+            id=f"org_{uuid.uuid4().hex[:12]}",
             name=request.org_name.strip(),
             slug=slug_clean,
             status="active",
             allowed_domains=request.allowed_domains or [],
         )
         session.add(org)
+        await session.flush()
 
-        # Check user or create
-        stmt_user = select(UserModel).where(UserModel.email == email_clean)
-        user = (await session.execute(stmt_user)).scalar_one_or_none()
-        if not user:
-            user_id = str(uuid.uuid4())
-            pw_hash = hash_password(request.admin_password) if request.admin_password else None
-            user = UserModel(
-                id=user_id,
-                email=email_clean,
-                full_name=request.admin_name.strip(),
-                password_hash=pw_hash,
-                is_active=True,
+        session.add(
+            OrganizationMembershipModel(
+                id=str(uuid.uuid4()),
+                org_id=org.id,
+                user_id=user.id,
+                role="owner",
+                status="active",
             )
-            session.add(user)
-            await session.flush()
-
-        # Create Owner membership
-        membership = OrganizationMembershipModel(
-            id=str(uuid.uuid4()),
-            org_id=org.id,
-            user_id=user.id,
-            role="owner",
-            status="active",
         )
-        session.add(membership)
-
-        # Audit log creation of new org
         session.add(
             AuditLogModel(
                 org_id=org.id,
@@ -302,26 +396,11 @@ async def register_organization(request: RegisterOrgRequest) -> LoginResponse:
         )
         await session.commit()
 
-        token = create_access_token(
-            user_id=user.id,
-            org_id=org.id,
-            role="owner",
-            email=user.email,
-            full_name=user.full_name,
-        )
-
-        identity = UserIdentity(
-            user_id=user.id,
-            org_id=org.id,
-            role="owner",
-            email=user.email,
-            full_name=user.full_name,
-        )
-
-        return LoginResponse(
-            access_token=token,
-            user=identity,
-            available_organizations=[{"id": org.id, "name": org.name, "slug": org.slug, "role": "owner"}],
+        return _token_response(
+            user,
+            org.id,
+            "owner",
+            [{"id": org.id, "name": org.name, "slug": org.slug, "role": "owner"}],
         )
 
 
@@ -332,61 +411,60 @@ async def switch_organization(
 ) -> LoginResponse:
     """Switch active tenant context for a multi-tenant user and generate a new JWT."""
     async with get_db_session(settings.database_url) as session:
-        stmt = select(OrganizationMembershipModel, OrganizationModel).join(
-            OrganizationModel, OrganizationModel.id == OrganizationMembershipModel.org_id
-        ).where(
-            OrganizationMembershipModel.user_id == current_user.user_id,
-            OrganizationMembershipModel.org_id == request.target_org_id,
-            OrganizationMembershipModel.status == "active",
-            OrganizationModel.status == "active",
-        )
-        result = (await session.execute(stmt)).first()
+        result = (
+            await session.execute(
+                select(OrganizationMembershipModel, OrganizationModel, UserModel)
+                .join(OrganizationModel, OrganizationModel.id == OrganizationMembershipModel.org_id)
+                .join(UserModel, UserModel.id == OrganizationMembershipModel.user_id)
+                .where(
+                    OrganizationMembershipModel.user_id == current_user.user_id,
+                    OrganizationMembershipModel.org_id == request.target_org_id,
+                    OrganizationMembershipModel.status == "active",
+                    OrganizationModel.status == "active",
+                    UserModel.is_active.is_(True),
+                )
+            )
+        ).first()
         if not result:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Access denied: You do not have an active membership in the requested organization.",
             )
 
-        target_mem, target_org = result
-        token = create_access_token(
-            user_id=current_user.user_id,
-            org_id=target_org.id,
-            role=target_mem.role,
-            email=current_user.email,
-            full_name=current_user.full_name,
-        )
-
-        identity = UserIdentity(
-            user_id=current_user.user_id,
-            org_id=target_org.id,
-            role=target_mem.role,
-            email=current_user.email,
-            full_name=current_user.full_name,
-        )
-
-        return LoginResponse(
-            access_token=token,
-            user=identity,
-            available_organizations=[{"id": target_org.id, "name": target_org.name, "slug": target_org.slug, "role": target_mem.role}],
+        target_mem, target_org, user_row = result
+        return _token_response(
+            user_row,
+            target_org.id,
+            target_mem.role,
+            [
+                {
+                    "id": target_org.id,
+                    "name": target_org.name,
+                    "slug": target_org.slug,
+                    "role": target_mem.role,
+                }
+            ],
         )
 
 
-@router.post("/invitations/accept", response_model=LoginResponse)
+@router.post(
+    "/invitations/accept", response_model=LoginResponse, dependencies=[Depends(auth_rate_limit)]
+)
 async def accept_invitation(request: AcceptInvitationRequest) -> LoginResponse:
     """Accept an organization invitation, create or link user account, and return tenant-scoped JWT."""
-    raw_token = request.token.strip()
-    token_hash = hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
+    token_hash = hashlib.sha256(request.token.strip().encode("utf-8")).hexdigest()
 
     async with get_db_session(settings.database_url) as session:
-        stmt_inv = (
-            select(OrganizationInvitationModel, OrganizationModel)
-            .join(OrganizationModel, OrganizationModel.id == OrganizationInvitationModel.org_id)
-            .where(
-                OrganizationInvitationModel.token_hash == token_hash,
-                OrganizationModel.status == "active",
+        result = (
+            await session.execute(
+                select(OrganizationInvitationModel, OrganizationModel)
+                .join(OrganizationModel, OrganizationModel.id == OrganizationInvitationModel.org_id)
+                .where(
+                    OrganizationInvitationModel.token_hash == token_hash,
+                    OrganizationModel.status == "active",
+                )
             )
-        )
-        result = (await session.execute(stmt_inv)).first()
+        ).first()
         if not result:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -394,71 +472,71 @@ async def accept_invitation(request: AcceptInvitationRequest) -> LoginResponse:
             )
 
         inv, org = result
-
         if inv.accepted_at is not None:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="This invitation has already been accepted.",
             )
 
-        # Check expiration
-        now_dt = utc_now()
         exp_dt = inv.expires_at
         if exp_dt.tzinfo is None:
             exp_dt = exp_dt.replace(tzinfo=UTC)
-        if now_dt > exp_dt:
+        if utc_now() > exp_dt:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="This invitation token has expired.",
             )
 
-        # Find or create user
-        stmt_user = select(UserModel).where(UserModel.email == inv.email.lower())
-        user = (await session.execute(stmt_user)).scalar_one_or_none()
+        user = (
+            await session.execute(select(UserModel).where(UserModel.email == inv.email.lower()))
+        ).scalar_one_or_none()
 
         if not user:
-            user_id = str(uuid.uuid4())
-            pw_hash = hash_password(request.password) if request.password else None
+            if not request.password:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=f"Choose a password of at least {MIN_PASSWORD_LENGTH} characters to create your account.",
+                )
             user = UserModel(
-                id=user_id,
+                id=str(uuid.uuid4()),
                 email=inv.email.lower(),
                 full_name=(request.full_name or inv.email.split("@")[0]).strip(),
-                password_hash=pw_hash,
+                password_hash=hash_password(request.password),
                 is_active=True,
             )
             session.add(user)
             await session.flush()
-        else:
-            if not user.is_active:
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail="Cannot accept invitation: user account is deactivated.",
-                )
+        elif not user.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Cannot accept invitation: user account is deactivated.",
+            )
 
-        # Check existing membership
-        stmt_mem = select(OrganizationMembershipModel).where(
-            OrganizationMembershipModel.org_id == org.id,
-            OrganizationMembershipModel.user_id == user.id,
-        )
-        existing_mem = (await session.execute(stmt_mem)).scalar_one_or_none()
+        existing_mem = (
+            await session.execute(
+                select(OrganizationMembershipModel).where(
+                    OrganizationMembershipModel.org_id == org.id,
+                    OrganizationMembershipModel.user_id == user.id,
+                )
+            )
+        ).scalar_one_or_none()
 
         if existing_mem:
             existing_mem.role = inv.role
             existing_mem.status = "active"
             existing_mem.updated_at = utc_now()
         else:
-            membership = OrganizationMembershipModel(
-                id=str(uuid.uuid4()),
-                org_id=org.id,
-                user_id=user.id,
-                role=inv.role,
-                status="active",
+            session.add(
+                OrganizationMembershipModel(
+                    id=str(uuid.uuid4()),
+                    org_id=org.id,
+                    user_id=user.id,
+                    role=inv.role,
+                    status="active",
+                )
             )
-            session.add(membership)
 
         inv.accepted_at = utc_now()
-
-        # Audit log
         session.add(
             AuditLogModel(
                 org_id=org.id,
@@ -472,25 +550,9 @@ async def accept_invitation(request: AcceptInvitationRequest) -> LoginResponse:
         )
         await session.commit()
 
-        token = create_access_token(
-            user_id=user.id,
-            org_id=org.id,
-            role=inv.role,
-            email=user.email,
-            full_name=user.full_name,
+        return _token_response(
+            user,
+            org.id,
+            inv.role,
+            [{"id": org.id, "name": org.name, "slug": org.slug, "role": inv.role}],
         )
-
-        identity = UserIdentity(
-            user_id=user.id,
-            org_id=org.id,
-            role=inv.role,
-            email=user.email,
-            full_name=user.full_name,
-        )
-
-        return LoginResponse(
-            access_token=token,
-            user=identity,
-            available_organizations=[{"id": org.id, "name": org.name, "slug": org.slug, "role": inv.role}],
-        )
-

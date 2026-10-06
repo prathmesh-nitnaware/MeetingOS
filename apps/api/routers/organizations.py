@@ -1,19 +1,17 @@
 import hashlib
+import re
 import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from apps.api.auth import (
+    ROLE_RANK,
     UserIdentity,
-    get_current_user,
-    require_admin,
-    require_member,
-    require_owner,
     require_permission,
     require_viewer,
 )
 from apps.api.config import settings
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from packages.memory.database import get_db_session
 from packages.memory.models import (
     AuditLogModel,
@@ -25,10 +23,11 @@ from packages.memory.models import (
     UserModel,
     utc_now,
 )
-from packages.memory.repository import MeetingRepository
 from packages.memory.retention import RetentionService
-from pydantic import BaseModel, EmailStr, Field
-from sqlalchemy import delete, func, select
+from pydantic import BaseModel, Field, field_validator
+from sqlalchemy import func, select
+
+EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 router = APIRouter(prefix="/organizations", tags=["Organization Administration"])
 
@@ -64,6 +63,22 @@ class InviteMemberRequest(BaseModel):
     email: str
     role: str = "member"
 
+    @field_validator("email")
+    @classmethod
+    def check_email(cls, value: str) -> str:
+        cleaned = value.strip().lower()
+        if not EMAIL_RE.match(cleaned):
+            raise ValueError("Enter a valid email address.")
+        return cleaned
+
+    @field_validator("role")
+    @classmethod
+    def check_role(cls, value: str) -> str:
+        role = value.strip().lower()
+        if role not in ROLE_RANK:
+            raise ValueError(f"Role must be one of: {', '.join(ROLE_RANK)}.")
+        return role
+
 
 class InvitationItem(BaseModel):
     invitation_id: str
@@ -76,10 +91,10 @@ class InvitationItem(BaseModel):
 
 
 class RetentionPolicySchema(BaseModel):
-    meeting_retention_days: int | None = None
-    audio_retention_days: int | None = None
-    transcript_retention_days: int | None = None
-    memory_retention_days: int | None = None
+    meeting_retention_days: int | None = Field(default=None, ge=1)
+    audio_retention_days: int | None = Field(default=None, ge=1)
+    transcript_retention_days: int | None = Field(default=None, ge=1)
+    memory_retention_days: int | None = Field(default=None, ge=1)
     auto_delete_enabled: bool = False
 
 
@@ -91,20 +106,6 @@ async def get_current_organization(
     async with get_db_session(settings.database_url) as session:
         stmt = select(OrganizationModel).where(OrganizationModel.id == user.org_id)
         org = (await session.execute(stmt)).scalar_one_or_none()
-
-        if not org:
-            # Fallback for dev tenant
-            return OrganizationDetail(
-                id=user.org_id,
-                name="Development Workspace",
-                slug=user.org_id,
-                status="active",
-                allowed_domains=[],
-                created_at=datetime.now(UTC),
-                updated_at=datetime.now(UTC),
-                total_members=1,
-                total_meetings=0,
-            )
 
         # Count active members and meetings
         mem_count = (
@@ -124,6 +125,20 @@ async def get_current_organization(
                 )
             )
         ).scalar() or 0
+
+        if not org:
+            # Tenant without an organizations row (e.g. dev tokens before fixtures are seeded)
+            return OrganizationDetail(
+                id=user.org_id,
+                name="Development Workspace",
+                slug=user.org_id,
+                status="active",
+                allowed_domains=[],
+                created_at=datetime.now(UTC),
+                updated_at=datetime.now(UTC),
+                total_members=max(mem_count, 1),
+                total_meetings=meet_count,
+            )
 
         return OrganizationDetail(
             id=org.id,
@@ -195,8 +210,16 @@ async def invite_member(
     request: InviteMemberRequest,
     user: UserIdentity = Depends(require_permission("members.invite")),
 ) -> InvitationItem:
-    """Invite a new member to join this organisation."""
-    email_clean = request.email.strip().lower()
+    """Invite a new member to join this organisation.
+
+    Nobody can grant a role above their own (an admin cannot create an owner).
+    """
+    if ROLE_RANK[request.role] > ROLE_RANK.get(user.role, -1):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Access denied: a {user.role} cannot invite someone as {request.role}.",
+        )
+    email_clean = request.email
     raw_token = f"inv_{uuid.uuid4().hex}"
     token_hash = hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
     expires = utc_now() + timedelta(days=7)
@@ -263,6 +286,11 @@ async def remove_member(
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Cannot remove an organization Owner.",
+            )
+        if ROLE_RANK.get(mem.role, 0) > ROLE_RANK.get(user.role, -1):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Cannot remove a member whose role is higher than yours.",
             )
 
         await session.delete(mem)
@@ -346,13 +374,12 @@ async def preview_retention_cleanup(
         stmt = select(RetentionPolicyModel).where(RetentionPolicyModel.org_id == user.org_id)
         policy = (await session.execute(stmt)).scalar_one_or_none()
 
-        meeting_days = policy.meeting_retention_days if policy else None
-        transcript_days = policy.transcript_retention_days if policy else None
-
-        service = RetentionService(session)
+        service = RetentionService(session, org_id=user.org_id)
         results = await service.run_cleanup(
-            meeting_days=meeting_days,
-            transcript_days=transcript_days,
+            meeting_days=policy.meeting_retention_days if policy else None,
+            transcript_days=policy.transcript_retention_days if policy else None,
+            audio_days=policy.audio_retention_days if policy else None,
+            evidence_days=policy.memory_retention_days if policy else None,
             dry_run=True,
             actor_id=user.user_id,
         )

@@ -73,16 +73,18 @@ class GraphService:
         # 1. Total meetings
         meetings_count = (
             await self.session.execute(
-                select(func.count(MeetingModel.id)).where(MeetingModel.org_id == self.org_id)
+                select(func.count(MeetingModel.id)).where(
+                    MeetingModel.org_id == self.org_id, MeetingModel.deleted_at.is_(None)
+                )
             )
         ).scalar() or 0
 
         # 2. Total decisions
         decisions_count = (
             await self.session.execute(
-                select(func.count(DecisionModel.id)).join(
-                    MeetingModel, MeetingModel.id == DecisionModel.meeting_id
-                ).where(MeetingModel.org_id == self.org_id)
+                select(func.count(DecisionModel.id))
+                .join(MeetingModel, MeetingModel.id == DecisionModel.meeting_id)
+                .where(MeetingModel.org_id == self.org_id, MeetingModel.deleted_at.is_(None))
             )
         ).scalar() or 0
 
@@ -93,6 +95,7 @@ class GraphService:
                 .join(MeetingModel, MeetingModel.id == CommitmentModel.meeting_id)
                 .where(
                     MeetingModel.org_id == self.org_id,
+                    MeetingModel.deleted_at.is_(None),
                     CommitmentModel.status.in_(
                         [
                             CommitmentStatus.IDENTIFIED,
@@ -110,6 +113,7 @@ class GraphService:
                 .join(MeetingModel, MeetingModel.id == CommitmentModel.meeting_id)
                 .where(
                     MeetingModel.org_id == self.org_id,
+                    MeetingModel.deleted_at.is_(None),
                     CommitmentModel.status == CommitmentStatus.OVERDUE,
                 )
             )
@@ -122,6 +126,7 @@ class GraphService:
                 .join(MeetingModel, MeetingModel.id == IssueModel.meeting_id)
                 .where(
                     MeetingModel.org_id == self.org_id,
+                    MeetingModel.deleted_at.is_(None),
                     IssueModel.status.in_(
                         [
                             IssueStatus.DETECTED,
@@ -140,13 +145,16 @@ class GraphService:
                 .join(MeetingModel, MeetingModel.id == IssueModel.meeting_id)
                 .where(
                     MeetingModel.org_id == self.org_id,
+                    MeetingModel.deleted_at.is_(None),
                     IssueModel.status == IssueStatus.RECURRING,
                 )
             )
         ).scalar() or 0
 
         # 5. Canonical Entities & Relationships — scoped via meeting membership
-        org_meeting_ids_stmt = select(MeetingModel.id).where(MeetingModel.org_id == self.org_id)
+        org_meeting_ids_stmt = select(MeetingModel.id).where(
+            MeetingModel.org_id == self.org_id, MeetingModel.deleted_at.is_(None)
+        )
         org_meeting_ids = list((await self.session.execute(org_meeting_ids_stmt)).scalars().all())
 
         entities_count = (
@@ -184,7 +192,9 @@ class GraphService:
     ) -> list[GraphNode]:
         """List canonical entities with cross-meeting presence counts, scoped to this organisation."""
         # Scope to meetings this org owns
-        org_meeting_ids_stmt = select(MeetingModel.id).where(MeetingModel.org_id == self.org_id)
+        org_meeting_ids_stmt = select(MeetingModel.id).where(
+            MeetingModel.org_id == self.org_id, MeetingModel.deleted_at.is_(None)
+        )
         org_meeting_ids = list((await self.session.execute(org_meeting_ids_stmt)).scalars().all())
         if not org_meeting_ids:
             return []
@@ -213,18 +223,23 @@ class GraphService:
         if entity_type is not None:
             stmt = stmt.where(EntityModel.entity_type == str(entity_type))
 
-        result = await self.session.execute(stmt)
-        nodes: list[GraphNode] = []
-        for r in result.all():
-            ent_id, name, etype, m_count = r
-            # Fetch only meeting IDs that belong to this org
-            m_stmt = select(MeetingEntityModel.meeting_id).where(
-                MeetingEntityModel.entity_id == ent_id,
-                MeetingEntityModel.meeting_id.in_(org_meeting_ids),
-            )
-            m_res = await self.session.execute(m_stmt)
-            m_ids = list(m_res.scalars().all())
+        rows = (await self.session.execute(stmt)).all()
 
+        # One query for the meeting IDs of every entity on this page (instead of one per entity)
+        meetings_by_entity: dict[str, list[str]] = {}
+        if rows:
+            link_rows = await self.session.execute(
+                select(MeetingEntityModel.entity_id, MeetingEntityModel.meeting_id).where(
+                    MeetingEntityModel.entity_id.in_([r[0] for r in rows]),
+                    MeetingEntityModel.meeting_id.in_(org_meeting_ids),
+                )
+            )
+            for ent_id, meeting_ref in link_rows.all():
+                meetings_by_entity.setdefault(ent_id, []).append(meeting_ref)
+
+        nodes: list[GraphNode] = []
+        for ent_id, name, etype, m_count in rows:
+            m_ids = meetings_by_entity.get(ent_id, [])
             nodes.append(
                 GraphNode(
                     id=ent_id,
@@ -239,7 +254,9 @@ class GraphService:
     async def get_entity_detail(self, entity_id: str) -> EntityDetailResponse | None:
         """Get detailed graph and cross-meeting history for an entity, scoped to this organisation."""
         # Resolve org-scoped meeting IDs for this entity
-        org_meeting_ids_stmt = select(MeetingModel.id).where(MeetingModel.org_id == self.org_id)
+        org_meeting_ids_stmt = select(MeetingModel.id).where(
+            MeetingModel.org_id == self.org_id, MeetingModel.deleted_at.is_(None)
+        )
         org_meeting_ids = list((await self.session.execute(org_meeting_ids_stmt)).scalars().all())
 
         m_stmt = select(MeetingEntityModel.meeting_id).where(
@@ -318,7 +335,9 @@ class GraphService:
     ) -> SubgraphResponse:
         """Extract a connected multi-hop subgraph linking entities across org meetings."""
         # Pre-compute org-scoped meeting IDs to constrain all relationship lookups
-        org_meeting_ids_stmt = select(MeetingModel.id).where(MeetingModel.org_id == self.org_id)
+        org_meeting_ids_stmt = select(MeetingModel.id).where(
+            MeetingModel.org_id == self.org_id, MeetingModel.deleted_at.is_(None)
+        )
         org_meeting_ids = list((await self.session.execute(org_meeting_ids_stmt)).scalars().all())
 
         visited_nodes: set[str] = set()
@@ -356,9 +375,11 @@ class GraphService:
                 current_frontier = next_frontier
         else:
             # Global cross-meeting subgraph — scoped to this org's meetings
-            stmt = select(RelationshipModel).where(
-                RelationshipModel.meeting_id.in_(org_meeting_ids)
-            ).limit(limit_edges)
+            stmt = (
+                select(RelationshipModel)
+                .where(RelationshipModel.meeting_id.in_(org_meeting_ids))
+                .limit(limit_edges)
+            )
             if relationship_types:
                 stmt = stmt.where(
                     RelationshipModel.relation_type.in_([str(rt) for rt in relationship_types])

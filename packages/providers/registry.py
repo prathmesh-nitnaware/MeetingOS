@@ -95,7 +95,7 @@ class ProviderCapabilityRegistry:
             ProviderCapability(
                 name="anthropic",
                 display_name="Anthropic Claude Provider",
-                default_model="claude-3-5-sonnet-20241022",
+                default_model="claude-opus-5-5",
                 supports_reasoning=True,
                 supports_embeddings=False,
                 supports_structured_output=True,
@@ -109,7 +109,7 @@ class ProviderCapabilityRegistry:
             ProviderCapability(
                 name="gemini",
                 display_name="Google Gemini Provider",
-                default_model="gemini-1.5-flash / text-embedding-004",
+                default_model="gemini-2.5-flash / gemini-embedding-001",
                 supports_reasoning=True,
                 supports_embeddings=True,
                 supports_structured_output=True,

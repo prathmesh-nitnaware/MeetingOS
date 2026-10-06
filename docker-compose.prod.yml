@@ -1,3 +1,16 @@
+# Production-style deployment.
+# Required in .env (or the shell): POSTGRES_PASSWORD, REDIS_PASSWORD, MEETINGOS_SECRET_KEY
+# (32+ random characters) and MEETINGOS_ALLOWED_ORIGINS for your domain.
+#   docker compose -f docker-compose.prod.yml up -d --build
+
+x-backend-env: &backend-env
+  APP_ENV: production
+  APP_DEBUG: "false"
+  MEETINGOS_ENABLE_DEV_AUTH: "false"
+  DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-meetingos}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-meetingos_db}
+  REDIS_URL: redis://:${REDIS_PASSWORD:?set REDIS_PASSWORD}@redis:6379/0
+  UPLOAD_STORAGE_DIR: /app/data/uploads
+
 services:
   postgres:
     image: pgvector/pgvector:pg16
@@ -5,17 +18,16 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-meetingos}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-meetingos_secret_password}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB:-meetingos_db}
-    ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+    # Not published to the host; only reachable on the internal network
     volumes:
       - pgdata_prod:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-meetingos} -d ${POSTGRES_DB:-meetingos_db}"]
       interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
     networks:
       - meetingos-net
 
@@ -23,15 +35,16 @@ services:
     image: redis:7-alpine
     container_name: meetingos-redis-prod
     restart: unless-stopped
-    ports:
-      - "${REDIS_PORT:-6379}:6379"
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD:?set REDIS_PASSWORD}", "--appendonly", "yes"]
     volumes:
       - redisdata_prod:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD-SHELL", "redis-cli -a \"$${REDIS_PASSWORD}\" --no-auth-warning ping | grep PONG"]
       interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?set REDIS_PASSWORD}
     networks:
       - meetingos-net
 
@@ -43,26 +56,27 @@ services:
     restart: unless-stopped
     env_file:
       - .env
-    environment:
-      - APP_ENV=production
-      - APP_DEBUG=false
-      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-meetingos}:${POSTGRES_PASSWORD:-meetingos_secret_password}@postgres:5432/${POSTGRES_DB:-meetingos_db}
-      - REDIS_URL=redis://redis:6379/0
+    environment: *backend-env
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - uploads:/app/data/uploads
+      - models:/app/models
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health/ready"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 12
+      start_period: 30s
     networks:
       - meetingos-net
 
+  # Speech-to-text is CPU/GPU heavy: one ingestion at a time per container
   worker-asr:
     build:
       context: .
@@ -71,99 +85,34 @@ services:
     restart: unless-stopped
     env_file:
       - .env
-    environment:
-      - APP_ENV=production
-      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-meetingos}:${POSTGRES_PASSWORD:-meetingos_secret_password}@postgres:5432/${POSTGRES_DB:-meetingos_db}
-      - REDIS_URL=redis://redis:6379/0
+    environment: *backend-env
     command: ["celery", "-A", "workers.celery_app", "worker", "-Q", "meetingos.asr", "-c", "1", "--loglevel=info"]
+    volumes:
+      - uploads:/app/data/uploads
+      - models:/app/models
     depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
+      api:
         condition: service_healthy
     networks:
       - meetingos-net
 
-  worker-nlp:
-    build:
-      context: .
-      dockerfile: Dockerfile.worker
-    container_name: meetingos-worker-nlp
-    restart: unless-stopped
-    env_file:
-      - .env
-    environment:
-      - APP_ENV=production
-      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-meetingos}:${POSTGRES_PASSWORD:-meetingos_secret_password}@postgres:5432/${POSTGRES_DB:-meetingos_db}
-      - REDIS_URL=redis://redis:6379/0
-    command: ["celery", "-A", "workers.celery_app", "worker", "-Q", "meetingos.nlp", "-c", "2", "--loglevel=info"]
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    networks:
-      - meetingos-net
-
-  worker-embedding:
-    build:
-      context: .
-      dockerfile: Dockerfile.worker
-    container_name: meetingos-worker-embedding
-    restart: unless-stopped
-    env_file:
-      - .env
-    environment:
-      - APP_ENV=production
-      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-meetingos}:${POSTGRES_PASSWORD:-meetingos_secret_password}@postgres:5432/${POSTGRES_DB:-meetingos_db}
-      - REDIS_URL=redis://redis:6379/0
-    command: ["celery", "-A", "workers.celery_app", "worker", "-Q", "meetingos.embedding", "-c", "2", "--loglevel=info"]
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    networks:
-      - meetingos-net
-
-  worker-sync:
-    build:
-      context: .
-      dockerfile: Dockerfile.worker
-    container_name: meetingos-worker-sync
-    restart: unless-stopped
-    env_file:
-      - .env
-    environment:
-      - APP_ENV=production
-      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-meetingos}:${POSTGRES_PASSWORD:-meetingos_secret_password}@postgres:5432/${POSTGRES_DB:-meetingos_db}
-      - REDIS_URL=redis://redis:6379/0
-    command: ["celery", "-A", "workers.celery_app", "worker", "-Q", "meetingos.sync", "-c", "2", "--loglevel=info"]
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    networks:
-      - meetingos-net
-
+  # Connector syncs and anything routed to the default queue
   worker-default:
     build:
       context: .
       dockerfile: Dockerfile.worker
+      args:
+        INSTALL_ASR: "false"
     container_name: meetingos-worker-default
     restart: unless-stopped
     env_file:
       - .env
-    environment:
-      - APP_ENV=production
-      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-meetingos}:${POSTGRES_PASSWORD:-meetingos_secret_password}@postgres:5432/${POSTGRES_DB:-meetingos_db}
-      - REDIS_URL=redis://redis:6379/0
-    command: ["celery", "-A", "workers.celery_app", "worker", "-Q", "default", "-c", "2", "--loglevel=info"]
+    environment: *backend-env
+    command: ["celery", "-A", "workers.celery_app", "worker", "-Q", "default,meetingos.sync", "-c", "2", "--loglevel=info"]
+    volumes:
+      - uploads:/app/data/uploads
     depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
+      api:
         condition: service_healthy
     networks:
       - meetingos-net
@@ -190,7 +139,9 @@ networks:
 volumes:
   pgdata_prod:
     name: meetingos_pgdata_prod
-    driver: local
   redisdata_prod:
     name: meetingos_redisdata_prod
-    driver: local
+  uploads:
+    name: meetingos_uploads_prod
+  models:
+    name: meetingos_models_prod

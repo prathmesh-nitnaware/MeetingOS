@@ -38,7 +38,9 @@ class MeetingModel(Base):
     __tablename__ = "meetings"
 
     id: Mapped[str] = mapped_column(String(100), primary_key=True, default=lambda: str(uuid4()))
-    org_id: Mapped[str] = mapped_column(String(64), nullable=False, default="org_dev", index=True)  # Tenant isolation key
+    org_id: Mapped[str] = mapped_column(
+        String(64), nullable=False, default="org_dev", index=True
+    )  # Tenant isolation key
     title: Mapped[str] = mapped_column(String(500), nullable=False)
     meeting_date: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, index=True
@@ -52,7 +54,9 @@ class MeetingModel(Base):
     metadata_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     source_provider: Mapped[str | None] = mapped_column(String(100), nullable=True, index=True)
     external_meeting_id: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
-    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
+    deleted_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, index=True
+    )
     deleted_by: Mapped[str | None] = mapped_column(String(100), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, nullable=False
@@ -107,7 +111,15 @@ class MeetingModel(Base):
 
     __table_args__ = (
         Index("ix_meetings_status_date", "processing_status", "meeting_date"),
-        Index("ix_meetings_external_id", "source_provider", "external_meeting_id", unique=True),
+        Index("ix_meetings_org_id_date", "org_id", "meeting_date"),
+        # One copy of an external (connector) meeting per organisation
+        Index(
+            "ix_meetings_org_external_id",
+            "org_id",
+            "source_provider",
+            "external_meeting_id",
+            unique=True,
+        ),
     )
 
 
@@ -181,6 +193,8 @@ class JobModel(Base):
     meeting_id: Mapped[str | None] = mapped_column(
         String(100), ForeignKey("meetings.id", ondelete="CASCADE"), nullable=True, index=True
     )
+    # Tenant owning the job (needed for jobs that are not yet linked to a meeting, e.g. syncs)
+    org_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     status: Mapped[str] = mapped_column(String(50), nullable=False, default="queued", index=True)
     stage: Mapped[str] = mapped_column(String(100), nullable=False, default="initialized")
     progress: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
@@ -484,7 +498,9 @@ class OrganizationModel(Base):
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     slug: Mapped[str] = mapped_column(String(100), unique=True, nullable=False, index=True)
-    status: Mapped[str] = mapped_column(String(50), nullable=False, default="active", index=True)  # active, suspended, deleted
+    status: Mapped[str] = mapped_column(
+        String(50), nullable=False, default="active", index=True
+    )  # active, suspended, deleted
     allowed_domains: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, nullable=False
@@ -500,7 +516,10 @@ class OrganizationModel(Base):
         "OrganizationInvitationModel", back_populates="organization", cascade="all, delete-orphan"
     )
     retention_policy: Mapped[Optional["RetentionPolicyModel"]] = relationship(
-        "RetentionPolicyModel", back_populates="organization", uselist=False, cascade="all, delete-orphan"
+        "RetentionPolicyModel",
+        back_populates="organization",
+        uselist=False,
+        cascade="all, delete-orphan",
     )
 
 
@@ -538,8 +557,12 @@ class OrganizationMembershipModel(Base):
     user_id: Mapped[str] = mapped_column(
         String(100), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
     )
-    role: Mapped[str] = mapped_column(String(50), nullable=False, default="member")  # owner, admin, member, viewer
-    status: Mapped[str] = mapped_column(String(50), nullable=False, default="active")  # active, suspended
+    role: Mapped[str] = mapped_column(
+        String(50), nullable=False, default="member"
+    )  # owner, admin, member, viewer
+    status: Mapped[str] = mapped_column(
+        String(50), nullable=False, default="active"
+    )  # active, suspended
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, nullable=False
     )
@@ -547,7 +570,9 @@ class OrganizationMembershipModel(Base):
         DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False
     )
 
-    organization: Mapped["OrganizationModel"] = relationship("OrganizationModel", back_populates="memberships")
+    organization: Mapped["OrganizationModel"] = relationship(
+        "OrganizationModel", back_populates="memberships"
+    )
     user: Mapped["UserModel"] = relationship("UserModel", back_populates="memberships")
 
     __table_args__ = (
@@ -563,11 +588,11 @@ class OrganizationInvitationModel(Base):
 
     id: Mapped[str] = mapped_column(String(100), primary_key=True, default=lambda: str(uuid4()))
     org_id: Mapped[str] = mapped_column(
-        String(64), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True
+        String(64), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False
     )
-    email: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    email: Mapped[str] = mapped_column(String(255), nullable=False)
     role: Mapped[str] = mapped_column(String(50), nullable=False, default="member")
-    token_hash: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
+    token_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     invited_by: Mapped[str] = mapped_column(
         String(100), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
@@ -577,7 +602,14 @@ class OrganizationInvitationModel(Base):
         DateTime(timezone=True), default=utc_now, nullable=False
     )
 
-    organization: Mapped["OrganizationModel"] = relationship("OrganizationModel", back_populates="invitations")
+    organization: Mapped["OrganizationModel"] = relationship(
+        "OrganizationModel", back_populates="invitations"
+    )
+
+    __table_args__ = (
+        Index("ix_org_invitations_token_hash", "token_hash", unique=True),
+        Index("ix_org_invitations_org_email", "org_id", "email"),
+    )
 
 
 class RetentionPolicyModel(Base):
@@ -587,7 +619,11 @@ class RetentionPolicyModel(Base):
 
     id: Mapped[str] = mapped_column(String(100), primary_key=True, default=lambda: str(uuid4()))
     org_id: Mapped[str] = mapped_column(
-        String(64), ForeignKey("organizations.id", ondelete="CASCADE"), unique=True, nullable=False, index=True
+        String(64),
+        ForeignKey("organizations.id", ondelete="CASCADE"),
+        unique=True,
+        nullable=False,
+        index=True,
     )
     meeting_retention_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
     audio_retention_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
@@ -601,5 +637,22 @@ class RetentionPolicyModel(Base):
         DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False
     )
 
-    organization: Mapped["OrganizationModel"] = relationship("OrganizationModel", back_populates="retention_policy")
+    organization: Mapped["OrganizationModel"] = relationship(
+        "OrganizationModel", back_populates="retention_policy"
+    )
 
+
+class AgentTraceModel(Base):
+    """Persisted multi-agent execution trace, scoped to the organisation that ran the query."""
+
+    __tablename__ = "agent_traces"
+
+    id: Mapped[str] = mapped_column(String(100), primary_key=True)
+    org_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    query: Mapped[str] = mapped_column(Text, nullable=False)
+    payload_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, nullable=False, index=True
+    )
+
+    __table_args__ = (Index("ix_agent_traces_org_created", "org_id", "created_at"),)

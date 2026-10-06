@@ -1,26 +1,24 @@
 import hashlib
-import uuid
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
 from apps.api.config import settings
 from apps.api.main import create_app
+from apps.api.routers.auth import hash_password
 from httpx import ASGITransport, AsyncClient
 from packages.common.enums import SourceType
 from packages.common.models import Meeting, Participant, SpeakerInfo, TranscriptSegment
 from packages.memory.graph import GraphService
 from packages.memory.models import (
-    AuditLogModel,
     Base,
     OrganizationMembershipModel,
     OrganizationModel,
     UserModel,
 )
 from packages.memory.repository import MeetingRepository
-from packages.reasoning.qa import QueryRequest, RAGPipeline
-from packages.reasoning.temporal import TemporalIntelligenceEngine
 from packages.retrieval.search import HybridSearchEngine
+from sqlalchemy import update as sa_update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 
@@ -188,16 +186,22 @@ async def test_api_endpoints_cross_tenant_isolation(tmp_path: Path):
         headers_beta = {"Authorization": "Bearer admin-beta-token"}
 
         # Test 1: Org B attempting to fetch Org A meeting -> 404
-        res_beta_single = await client.get("/api/v1/meetings/meet-dev-secret-01", headers=headers_beta)
+        res_beta_single = await client.get(
+            "/api/v1/meetings/meet-dev-secret-01", headers=headers_beta
+        )
         assert res_beta_single.status_code == 404
 
         # Test 2: Org A can retrieve its own meeting -> 200
-        res_dev_single = await client.get("/api/v1/meetings/meet-dev-secret-01", headers=headers_dev)
+        res_dev_single = await client.get(
+            "/api/v1/meetings/meet-dev-secret-01", headers=headers_dev
+        )
         assert res_dev_single.status_code == 200
         assert res_dev_single.json()["meeting_id"] == "meet-dev-secret-01"
 
         # Test 3: Org B attempting to delete Org A meeting -> 404 failure
-        res_beta_delete = await client.delete("/api/v1/meetings/meet-dev-secret-01", headers=headers_beta)
+        res_beta_delete = await client.delete(
+            "/api/v1/meetings/meet-dev-secret-01", headers=headers_beta
+        )
         assert res_beta_delete.status_code == 404
 
         # Test 4: Org B search returns 0 results for Org A data
@@ -206,15 +210,21 @@ async def test_api_endpoints_cross_tenant_isolation(tmp_path: Path):
         assert res_beta_search.json()["total_results"] == 0
 
         # Test 5: Org B cannot download Org A audio -> 404
-        res_beta_audio = await client.get("/api/v1/meetings/meet-dev-secret-01/audio", headers=headers_beta)
+        res_beta_audio = await client.get(
+            "/api/v1/meetings/meet-dev-secret-01/audio", headers=headers_beta
+        )
         assert res_beta_audio.status_code == 404
 
         # Test 5b: Org A can download its own audio -> 200
-        res_dev_audio = await client.get("/api/v1/meetings/meet-dev-secret-01/audio", headers=headers_dev)
+        res_dev_audio = await client.get(
+            "/api/v1/meetings/meet-dev-secret-01/audio", headers=headers_dev
+        )
         assert res_dev_audio.status_code == 200
 
         # Test 6: Org B cannot retrieve Org A transcript -> 404
-        res_beta_tx = await client.get("/api/v1/meetings/meet-dev-secret-01/transcript", headers=headers_beta)
+        res_beta_tx = await client.get(
+            "/api/v1/meetings/meet-dev-secret-01/transcript", headers=headers_beta
+        )
         assert res_beta_tx.status_code == 404
 
         # Test 8: Org B cannot access Org A audit logs
@@ -228,7 +238,9 @@ async def test_api_endpoints_cross_tenant_isolation(tmp_path: Path):
         assert len(res_dev_audit.json()) >= 1
 
         # Test 11: Soft delete lifecycle in Org A
-        res_dev_del = await client.delete("/api/v1/meetings/meet-dev-secret-01", headers=headers_dev)
+        res_dev_del = await client.delete(
+            "/api/v1/meetings/meet-dev-secret-01", headers=headers_dev
+        )
         assert res_dev_del.status_code == 200
         assert res_dev_del.json()["deletion_type"] == "soft_delete"
 
@@ -258,12 +270,22 @@ async def test_multi_organization_user_and_revocation(tmp_path: Path):
         session.add_all([org1, org2])
 
         # Seed 1 user belonging to both orgs
-        user = UserModel(id="usr-carol", email="carol@enterprise.com", full_name="Carol Danvers", is_active=True)
+        user = UserModel(
+            id="usr-carol",
+            email="carol@enterprise.com",
+            full_name="Carol Danvers",
+            password_hash=hash_password("Carol-Password-1"),
+            is_active=True,
+        )
         session.add(user)
         await session.flush()
 
-        mem1 = OrganizationMembershipModel(id="mem-1", org_id="org_acme", user_id=user.id, role="admin", status="active")
-        mem2 = OrganizationMembershipModel(id="mem-2", org_id="org_globex", user_id=user.id, role="member", status="active")
+        mem1 = OrganizationMembershipModel(
+            id="mem-1", org_id="org_acme", user_id=user.id, role="admin", status="active"
+        )
+        mem2 = OrganizationMembershipModel(
+            id="mem-2", org_id="org_globex", user_id=user.id, role="member", status="active"
+        )
         session.add_all([mem1, mem2])
         await session.commit()
 
@@ -271,8 +293,30 @@ async def test_multi_organization_user_and_revocation(tmp_path: Path):
     transport = ASGITransport(app=test_app)
 
     async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+        # Login without / with a wrong password is refused
+        res_nopw = await client.post(
+            "/api/v1/auth/login", json={"email": "carol@enterprise.com", "org_slug": "acme"}
+        )
+        assert res_nopw.status_code == 401
+        res_badpw = await client.post(
+            "/api/v1/auth/login",
+            json={
+                "email": "carol@enterprise.com",
+                "password": "wrong-password",
+                "org_slug": "acme",
+            },
+        )
+        assert res_badpw.status_code == 401
+
         # Login Carol with Acme
-        res_login = await client.post("/api/v1/auth/login", json={"email": "carol@enterprise.com", "org_slug": "acme"})
+        res_login = await client.post(
+            "/api/v1/auth/login",
+            json={
+                "email": "carol@enterprise.com",
+                "password": "Carol-Password-1",
+                "org_slug": "acme",
+            },
+        )
         assert res_login.status_code == 200
         token_acme = res_login.json()["access_token"]
         assert res_login.json()["user"]["org_id"] == "org_acme"
@@ -291,9 +335,11 @@ async def test_multi_organization_user_and_revocation(tmp_path: Path):
 
         # Revoke Carol's membership in Globex
         async with session_factory() as session:
-            stmt = OrganizationMembershipModel.__table__.update().where(
-                OrganizationMembershipModel.id == "mem-2"
-            ).values(status="suspended")
+            stmt = (
+                sa_update(OrganizationMembershipModel)
+                .where(OrganizationMembershipModel.id == "mem-2")
+                .values(status="suspended")
+            )
             await session.execute(stmt)
             await session.commit()
 
@@ -305,11 +351,19 @@ async def test_multi_organization_user_and_revocation(tmp_path: Path):
         )
         assert res_switch_revoked.status_code == 403
 
+        # A token issued before the revocation stops working immediately
+        res_old_token = await client.get(
+            "/api/v1/auth/me", headers={"Authorization": f"Bearer {token_globex}"}
+        )
+        assert res_old_token.status_code == 401
+
     await engine.dispose()
 
 
 @pytest.mark.asyncio
-async def test_invitation_lifecycle_and_single_use_security(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+async def test_invitation_lifecycle_and_single_use_security(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
     """Verify cryptographically secure invitation generation, single-use, expiry, and tenant binding."""
     db_file = tmp_path / "test_invite_sec.db"
     db_url = f"sqlite+aiosqlite:///{db_file.as_posix()}"
@@ -319,11 +373,21 @@ async def test_invitation_lifecycle_and_single_use_security(tmp_path: Path, monk
 
     session_factory = async_sessionmaker(bind=engine, class_=AsyncSession, expire_on_commit=False)
     async with session_factory() as session:
-        org = OrganizationModel(id="org_invite_corp", name="Invite Corp", slug="invite-corp", status="active")
-        owner = UserModel(id="usr-inviter", email="inviter@invitecorp.com", full_name="Inviter Admin", is_active=True)
+        org = OrganizationModel(
+            id="org_invite_corp", name="Invite Corp", slug="invite-corp", status="active"
+        )
+        owner = UserModel(
+            id="usr-inviter",
+            email="inviter@invitecorp.com",
+            full_name="Inviter Admin",
+            password_hash=hash_password("Inviter-Password-1"),
+            is_active=True,
+        )
         session.add_all([org, owner])
         await session.flush()
-        mem = OrganizationMembershipModel(id="mem-inv", org_id=org.id, user_id=owner.id, role="owner", status="active")
+        mem = OrganizationMembershipModel(
+            id="mem-inv", org_id=org.id, user_id=owner.id, role="owner", status="active"
+        )
         session.add(mem)
         await session.commit()
 
@@ -333,7 +397,14 @@ async def test_invitation_lifecycle_and_single_use_security(tmp_path: Path, monk
 
     async with AsyncClient(transport=transport, base_url="http://testserver") as client:
         # 1. Login owner
-        res_login = await client.post("/api/v1/auth/login", json={"email": "inviter@invitecorp.com", "org_slug": "invite-corp"})
+        res_login = await client.post(
+            "/api/v1/auth/login",
+            json={
+                "email": "inviter@invitecorp.com",
+                "password": "Inviter-Password-1",
+                "org_slug": "invite-corp",
+            },
+        )
         token_owner = res_login.json()["access_token"]
 
         # 2. Issue invitation
@@ -350,7 +421,11 @@ async def test_invitation_lifecycle_and_single_use_security(tmp_path: Path, monk
         # 3. Accept invitation
         res_accept = await client.post(
             "/api/v1/auth/invitations/accept",
-            json={"token": raw_token, "full_name": "Recruit User", "password": "SecurePassword123!"},
+            json={
+                "token": raw_token,
+                "full_name": "Recruit User",
+                "password": "SecurePassword123!",
+            },
         )
         assert res_accept.status_code == 200
         accept_data = res_accept.json()
@@ -369,7 +444,11 @@ async def test_invitation_lifecycle_and_single_use_security(tmp_path: Path, monk
         # 5. Invalid token -> must fail 404
         res_invalid = await client.post(
             "/api/v1/auth/invitations/accept",
-            json={"token": "inv_completely_fake_token", "full_name": "Hacker", "password": "Pass"},
+            json={
+                "token": "inv_completely_fake_token",
+                "full_name": "Hacker",
+                "password": "Hacker-Password-1",
+            },
         )
         assert res_invalid.status_code == 404
 
@@ -377,7 +456,9 @@ async def test_invitation_lifecycle_and_single_use_security(tmp_path: Path, monk
 
 
 @pytest.mark.asyncio
-async def test_audio_storage_isolation_and_path_security(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+async def test_audio_storage_isolation_and_path_security(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
     """Verify that audio downloads strictly enforce tenant boundaries and block path traversal."""
     db_file = tmp_path / "test_audio_sec.db"
     db_url = f"sqlite+aiosqlite:///{db_file.as_posix()}"
@@ -411,6 +492,26 @@ async def test_audio_storage_isolation_and_path_security(tmp_path: Path, monkeyp
             participants=[],
         )
         await repo.create_meeting(m_beta, org_id="org_beta")
+        # Tokens are re-validated against real memberships
+        session.add_all(
+            [
+                OrganizationModel(id="org_alpha", name="Alpha", slug="alpha", status="active"),
+                OrganizationModel(id="org_beta", name="Beta", slug="beta", status="active"),
+                UserModel(id="u_a", email="a@alpha.example", full_name="A", is_active=True),
+                UserModel(id="u_b", email="b@beta.example", full_name="B", is_active=True),
+            ]
+        )
+        await session.flush()
+        session.add_all(
+            [
+                OrganizationMembershipModel(
+                    id="mem-a", org_id="org_alpha", user_id="u_a", role="viewer", status="active"
+                ),
+                OrganizationMembershipModel(
+                    id="mem-b", org_id="org_beta", user_id="u_b", role="viewer", status="active"
+                ),
+            ]
+        )
         await session.commit()
 
     # Create tenant-scoped storage files
@@ -432,20 +533,30 @@ async def test_audio_storage_isolation_and_path_security(tmp_path: Path, monkeyp
 
     async with AsyncClient(transport=transport, base_url="http://testserver") as client:
         from apps.api.auth import create_access_token
+
         token_alpha = create_access_token(user_id="u_a", org_id="org_alpha", role="viewer")
         token_beta = create_access_token(user_id="u_b", org_id="org_beta", role="viewer")
 
         # Alpha accesses Alpha -> Success
-        res_a_a = await client.get("/api/v1/meetings/meet-audio-alpha/audio", headers={"Authorization": f"Bearer {token_alpha}"})
+        res_a_a = await client.get(
+            "/api/v1/meetings/meet-audio-alpha/audio",
+            headers={"Authorization": f"Bearer {token_alpha}"},
+        )
         assert res_a_a.status_code == 200
         assert res_a_a.content == b"RIFFALPHA_SECRET_AUDIO_PAYLOAD"
 
         # Beta tries to access Alpha audio -> 404 Not Found (Tenant isolated)
-        res_b_a = await client.get("/api/v1/meetings/meet-audio-alpha/audio", headers={"Authorization": f"Bearer {token_beta}"})
+        res_b_a = await client.get(
+            "/api/v1/meetings/meet-audio-alpha/audio",
+            headers={"Authorization": f"Bearer {token_beta}"},
+        )
         assert res_b_a.status_code == 404
 
         # Alpha tries to access Beta audio -> 404 Not Found
-        res_a_b = await client.get("/api/v1/meetings/meet-audio-beta/audio", headers={"Authorization": f"Bearer {token_alpha}"})
+        res_a_b = await client.get(
+            "/api/v1/meetings/meet-audio-beta/audio",
+            headers={"Authorization": f"Bearer {token_alpha}"},
+        )
         assert res_a_b.status_code == 404
 
     await engine.dispose()
@@ -455,6 +566,7 @@ async def test_audio_storage_isolation_and_path_security(tmp_path: Path, monkeyp
 async def test_concurrent_multi_tenant_ingestion_isolation(tmp_path: Path):
     """Verify simultaneous concurrent ingestion pipelines across separate tenants preserve complete data isolation."""
     import asyncio
+
     from workers.tasks.ingestion import run_ingestion_pipeline
 
     db_file = tmp_path / "test_concurrent_ingest.db"
@@ -468,8 +580,20 @@ async def test_concurrent_multi_tenant_ingestion_isolation(tmp_path: Path):
     dt = datetime(2026, 9, 1, 10, 0, 0, tzinfo=UTC)
     async with session_factory() as session:
         repo = MeetingRepository(session)
-        m1 = Meeting(meeting_id="meet-conc-1", title="Tenant One All Hands", meeting_date=dt, source_type=SourceType.AUDIO_WAV, participants=[])
-        m2 = Meeting(meeting_id="meet-conc-2", title="Tenant Two Board Review", meeting_date=dt, source_type=SourceType.AUDIO_WAV, participants=[])
+        m1 = Meeting(
+            meeting_id="meet-conc-1",
+            title="Tenant One All Hands",
+            meeting_date=dt,
+            source_type=SourceType.AUDIO_WAV,
+            participants=[],
+        )
+        m2 = Meeting(
+            meeting_id="meet-conc-2",
+            title="Tenant Two Board Review",
+            meeting_date=dt,
+            source_type=SourceType.AUDIO_WAV,
+            participants=[],
+        )
         await repo.create_meeting(m1, org_id="org_tenant_1")
         await repo.create_meeting(m2, org_id="org_tenant_2")
         await repo.create_job("job-conc-1", "meet-conc-1", "queued")
@@ -542,4 +666,3 @@ def test_pbkdf2_password_hashing_and_verification():
     legacy_sha256 = hashlib.sha256(raw_pw.encode("utf-8")).hexdigest()
     assert verify_password(raw_pw, legacy_sha256) is True
     assert verify_password("WrongPassword", legacy_sha256) is False
-

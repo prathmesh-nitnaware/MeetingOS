@@ -1,92 +1,84 @@
-import React from "react"
+import React, { useEffect, useState } from "react"
 import { NavLink } from "react-router-dom"
 import {
-  LayoutDashboard,
-  Video,
-  Search,
-  Network,
-  History,
   Activity,
-  GitBranch,
   BarChart3,
+  GitBranch,
+  History,
+  LayoutDashboard,
+  LogOut,
+  Network,
+  Search,
+  Settings,
   Sliders,
-  Settings
+  Video,
 } from "lucide-react"
+import { useAuth } from "../auth/AuthContext"
+import { api } from "../services/api"
 
-export const Sidebar: React.FC = () => {
+const LINKS = [
+  { to: "/", label: "Dashboard", icon: LayoutDashboard, end: true },
+  { to: "/meetings", label: "Meetings", icon: Video },
+  { to: "/search", label: "Search & QA", icon: Search },
+  { to: "/entities", label: "Entities & Graph", icon: Network },
+  { to: "/temporal", label: "Timeline Intelligence", icon: History },
+  { to: "/traces", label: "Agent Traces", icon: GitBranch },
+  { to: "/metrics", label: "Observability", icon: BarChart3 },
+  { to: "/providers", label: "AI Providers", icon: Sliders },
+  { to: "/settings", label: "System Settings", icon: Settings },
+]
+
+interface SidebarProps {
+  open: boolean
+  onNavigate: () => void
+}
+
+export const Sidebar: React.FC<SidebarProps> = ({ open, onNavigate }) => {
+  const { profile, signOut } = useAuth()
+  const [version, setVersion] = useState<string | null>(null)
+
+  useEffect(() => {
+    api
+      .getHealth()
+      .then((h) => setVersion(h.version))
+      .catch(() => setVersion(null))
+  }, [])
+
   return (
-    <aside className="sidebar">
+    <aside className={`sidebar${open ? " open" : ""}`} aria-label="Main navigation">
       <div className="sidebar-logo">
-        <Activity size={24} className="text-accent-indigo" />
+        <Activity size={24} className="text-accent-indigo" aria-hidden="true" />
         <span>MeetingOS</span>
       </div>
       <nav className="nav-menu">
-        <NavLink
-          to="/"
-          className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`}
-        >
-          <LayoutDashboard size={18} />
-          <span>Dashboard</span>
-        </NavLink>
-        <NavLink
-          to="/meetings"
-          className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`}
-        >
-          <Video size={18} />
-          <span>Meetings</span>
-        </NavLink>
-        <NavLink
-          to="/search"
-          className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`}
-        >
-          <Search size={18} />
-          <span>Search & QA</span>
-        </NavLink>
-        <NavLink
-          to="/entities"
-          className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`}
-        >
-          <Network size={18} />
-          <span>Entities & Graph</span>
-        </NavLink>
-        <NavLink
-          to="/temporal"
-          className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`}
-        >
-          <History size={18} />
-          <span>Timeline Intelligence</span>
-        </NavLink>
-        <NavLink
-          to="/traces"
-          className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`}
-        >
-          <GitBranch size={18} />
-          <span>Agent Traces</span>
-        </NavLink>
-        <NavLink
-          to="/metrics"
-          className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`}
-        >
-          <BarChart3 size={18} />
-          <span>Observability</span>
-        </NavLink>
-        <NavLink
-          to="/providers"
-          className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`}
-        >
-          <Sliders size={18} />
-          <span>AI Providers</span>
-        </NavLink>
-        <NavLink
-          to="/settings"
-          className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`}
-        >
-          <Settings size={18} />
-          <span>System Settings</span>
-        </NavLink>
+        {LINKS.map(({ to, label, icon: Icon, end }) => (
+          <NavLink
+            key={to}
+            to={to}
+            end={end}
+            onClick={onNavigate}
+            className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`}
+          >
+            <Icon size={18} aria-hidden="true" />
+            <span>{label}</span>
+          </NavLink>
+        ))}
       </nav>
+
+      {profile && (
+        <div className="sidebar-user">
+          <div className="sidebar-user-name">{profile.full_name || profile.email || profile.user_id}</div>
+          <div className="sidebar-user-meta">
+            {profile.organization_name || profile.org_id} · {profile.role}
+          </div>
+          <button type="button" className="btn btn-outline sidebar-signout" onClick={() => signOut()}>
+            <LogOut size={14} aria-hidden="true" />
+            <span>Sign out</span>
+          </button>
+        </div>
+      )}
       <div className="sidebar-footer">
-        <p>v0.1.0 • Phase 12 Production</p>
+        <p>{version ? `MeetingOS v${version}` : "MeetingOS"}</p>
       </div>
     </aside>
   )

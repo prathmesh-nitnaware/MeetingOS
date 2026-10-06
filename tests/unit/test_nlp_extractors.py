@@ -49,6 +49,24 @@ async def test_rule_based_classifier():
 
 
 @pytest.mark.asyncio
+async def test_classifier_recognizes_spoken_decisions():
+    classifier = RuleBasedClassifier()
+
+    # Phrasings taken from a real Whisper transcript
+    for text in (
+        "One, decision taken, pgvector inside Postgres is our vector store for version one.",
+        "Okay, we're going with the managed Redis offering.",
+        "Let's go with the two week sprint cadence.",
+        "The final decision is on the product team.",
+    ):
+        assert UtteranceClass.DECISION in await classifier.classify_utterance(text), text
+
+    # Talking about decisions is not a decision
+    for text in ("Decisions are the weak point.", "It delays the decision timeline view."):
+        assert UtteranceClass.DECISION not in await classifier.classify_utterance(text), text
+
+
+@pytest.mark.asyncio
 async def test_rule_based_temporal_extractor():
     extractor = RuleBasedTemporalExtractor()
     ref_date = datetime(2026, 8, 25, 10, 0, 0, tzinfo=UTC)  # Tuesday

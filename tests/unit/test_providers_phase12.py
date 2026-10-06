@@ -68,3 +68,23 @@ def test_usage_tracker_cost_and_metrics():
     assert summary.total_tokens == 1700
     assert summary.total_cost_usd > 0.0
     assert summary.avg_latency_ms > 0.0
+
+
+def test_latency_percentiles_include_slow_outliers():
+    tracker = UsageTracker()
+    for latency in (1.0, 1.0, 1.0, 2.0, 3.0, 3.0, 140.0):
+        tracker.record_usage("local", "local", latency_ms=latency)
+
+    summary = tracker.get_summary()
+    assert summary.p50_latency_ms == 2.0
+    # A single slow request must show up in the tail, not only in the average
+    assert summary.p99_latency_ms >= summary.p95_latency_ms >= summary.avg_latency_ms
+    assert summary.p99_latency_ms > 130.0
+
+
+def test_cost_uses_the_most_specific_model_price():
+    tracker = UsageTracker()
+    mini = tracker.estimate_cost("gpt-4o-mini-2024-07-18", 1_000_000, 0)
+    full = tracker.estimate_cost("gpt-4o-2024-08-06", 1_000_000, 0)
+    assert mini == 0.15
+    assert full == 2.50
