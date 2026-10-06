@@ -1,0 +1,120 @@
+{
+  "meeting_id": "meet-2026-08-25-arch-001",
+  "title": "MeetingOS Architecture & Database Strategy Sync",
+  "meeting_date": "2026-08-25T10:00:00Z",
+  "duration_seconds": 920.5,
+  "source_type": "audio/wav",
+  "processing_status": "succeeded",
+  "participants": [
+    {
+      "id": "user-priya-01",
+      "canonical_name": "Priya Sharma",
+      "aliases": ["Priya", "PS"]
+    },
+    {
+      "id": "user-rahul-02",
+      "canonical_name": "Rahul Verma",
+      "aliases": ["Rahul", "RV"]
+    },
+    {
+      "id": "user-sarah-03",
+      "canonical_name": "Sarah Chen",
+      "aliases": ["Sarah", "SC"]
+    }
+  ],
+  "speakers": [
+    {
+      "speaker_id": "spk_0",
+      "name": "Priya Sharma",
+      "canonical_entity_id": "user-priya-01"
+    },
+    {
+      "speaker_id": "spk_1",
+      "name": "Rahul Verma",
+      "canonical_entity_id": "user-rahul-02"
+    },
+    {
+      "speaker_id": "spk_2",
+      "name": "Sarah Chen",
+      "canonical_entity_id": "user-sarah-03"
+    }
+  ],
+  "segments": [
+    {
+      "segment_id": "seg-001",
+      "sequence": 0,
+      "speaker_id": "spk_0",
+      "start_time": 0.0,
+      "end_time": 14.5,
+      "text": "Good morning team. Today we need to resolve the database and vector storage architecture for MeetingOS."
+    },
+    {
+      "segment_id": "seg-002",
+      "sequence": 1,
+      "speaker_id": "spk_1",
+      "start_time": 15.0,
+      "end_time": 42.8,
+      "text": "Yesterday I finished the benchmark comparison between MongoDB and PostgreSQL with pgvector. We noticed intermittent connection pooling timeouts with MongoDB during high-concurrency ingestion tests."
+    },
+    {
+      "segment_id": "seg-003",
+      "sequence": 2,
+      "speaker_id": "spk_2",
+      "start_time": 43.5,
+      "end_time": 75.0,
+      "text": "Furthermore, PostgreSQL allows us to keep our relational entity graph and dense vector embeddings in a single ACID store, which eliminates dual-write synchronization complexity."
+    },
+    {
+      "segment_id": "seg-004",
+      "sequence": 3,
+      "speaker_id": "spk_0",
+      "start_time": 76.2,
+      "end_time": 98.4,
+      "text": "That makes complete sense. Let us officially decide to adopt PostgreSQL 16 with pgvector as our primary organizational memory store."
+    },
+    {
+      "segment_id": "seg-005",
+      "sequence": 4,
+      "speaker_id": "spk_0",
+      "start_time": 99.0,
+      "end_time": 120.5,
+      "text": "Rahul, please finalize the initial SQLAlchemy models and Alembic migrations by Friday August 28."
+    },
+    {
+      "segment_id": "seg-006",
+      "sequence": 5,
+      "speaker_id": "spk_1",
+      "start_time": 121.0,
+      "end_time": 135.2,
+      "text": "I will deliver the database foundation and Common Meeting Format schemas by Friday."
+    },
+    {
+      "segment_id": "seg-007",
+      "sequence": 6,
+      "speaker_id": "spk_2",
+      "start_time": 136.0,
+      "end_time": 158.0,
+      "text": "I will take the action item to evaluate sentence-transformers and faster-whisper on our local development hardware next week."
+    },
+    {
+      "segment_id": "seg-008",
+      "sequence": 7,
+      "speaker_id": "spk_0",
+      "start_time": 159.0,
+      "end_time": 172.5,
+      "text": "Excellent. We will reconvene next Monday to review the initial Phase 0 test results."
+    }
+  ],
+  "metadata": {
+    "source_filename": "arch_sync_20260825.wav",
+    "file_size_bytes": 15284920,
+    "audio_sample_rate_hz": 16000,
+    "audio_channels": 1,
+    "audio_duration_seconds": 920.5,
+    "model_pipeline_version": "1.0.0",
+    "extra": {
+      "recording_location": "Conference Room B",
+      "confidentiality": "Internal"
+    }
+  }
+}

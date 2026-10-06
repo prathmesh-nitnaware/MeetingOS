@@ -1,0 +1,60 @@
+{
+  "meeting_id": "meet-eval-001",
+  "title": "Kickoff and Database Evaluation",
+  "meeting_date": "2026-08-20T10:00:00Z",
+  "source_type": "audio/wav",
+  "participants": [
+    {
+      "id": "p-rahul-m1",
+      "canonical_name": "Rahul Verma"
+    },
+    {
+      "id": "p-priya-m1",
+      "canonical_name": "Priya Sharma"
+    },
+    {
+      "id": "p-alex-m1",
+      "canonical_name": "Alex Rivera"
+    }
+  ],
+  "speakers": [
+    {
+      "speaker_id": "spk_rahul",
+      "name": "Rahul Verma"
+    },
+    {
+      "speaker_id": "spk_priya",
+      "name": "Priya Sharma"
+    },
+    {
+      "speaker_id": "spk_alex",
+      "name": "Alex Rivera"
+    }
+  ],
+  "segments": [
+    {
+      "segment_id": "seg-m1-01",
+      "sequence": 0,
+      "speaker_id": "spk_rahul",
+      "start_time": 0.0,
+      "end_time": 10.0,
+      "text": "Rahul Verma: We are kickstarting MeetingOS project. We need to choose between MongoDB and PostgreSQL for our core data layer."
+    },
+    {
+      "segment_id": "seg-m1-02",
+      "sequence": 1,
+      "speaker_id": "spk_priya",
+      "start_time": 10.5,
+      "end_time": 25.0,
+      "text": "Priya Sharma: MongoDB is flexible, but PostgreSQL with pgvector supports vector embedding lookups directly."
+    },
+    {
+      "segment_id": "seg-m1-03",
+      "sequence": 2,
+      "speaker_id": "spk_alex",
+      "start_time": 25.5,
+      "end_time": 35.0,
+      "text": "Alex Rivera: We have a timeout issue in Redis cache that is causing connection failures."
+    }
+  ]
+}

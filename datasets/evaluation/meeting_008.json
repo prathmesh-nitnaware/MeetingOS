@@ -1,0 +1,38 @@
+{
+  "meeting_id": "meet-eval-008",
+  "title": "Redis Incident Post-Mortem",
+  "meeting_date": "2026-09-03T15:00:00Z",
+  "source_type": "audio/wav",
+  "participants": [
+    {"id": "p-alex-m8", "canonical_name": "Alex Rivera"},
+    {"id": "p-rahul-m8", "canonical_name": "Rahul Verma"},
+    {"id": "p-kiran-m8", "canonical_name": "Kiran Das"}
+  ],
+  "speakers": [
+    {"speaker_id": "spk_alex", "name": "Alex Rivera"},
+    {"speaker_id": "spk_rahul", "name": "Rahul Verma"},
+    {"speaker_id": "spk_kiran", "name": "Kiran Das"}
+  ],
+  "segments": [
+    {
+      "segment_id": "seg-m8-01", "sequence": 0, "speaker_id": "spk_alex",
+      "start_time": 0.0, "end_time": 22.0,
+      "text": "Alex Rivera: The Redis timeout issue is now fully resolved. I implemented a circuit breaker using the tenacity library and configured exponential backoff. The fix was deployed on September 3rd."
+    },
+    {
+      "segment_id": "seg-m8-02", "sequence": 1, "speaker_id": "spk_kiran",
+      "start_time": 22.5, "end_time": 42.0,
+      "text": "Kiran Das: The Kubernetes cluster is set up and the staging environment is running on it. However, we discovered a new issue: pod startup times are exceeding 30 seconds due to large Docker images."
+    },
+    {
+      "segment_id": "seg-m8-03", "sequence": 2, "speaker_id": "spk_rahul",
+      "start_time": 42.5, "end_time": 62.0,
+      "text": "Rahul Verma: We decided to switch our NLP caching strategy from write-through to write-behind to reduce latency. This modifies the original Redis caching decision from the kickoff meeting."
+    },
+    {
+      "segment_id": "seg-m8-04", "sequence": 3, "speaker_id": "spk_alex",
+      "start_time": 62.5, "end_time": 82.0,
+      "text": "Alex Rivera: Kiran Das is assigned to optimize the Docker images. Target: reduce image size by 60 percent. Deadline is September 12th."
+    }
+  ]
+}

@@ -1,0 +1,38 @@
+{
+  "meeting_id": "meet-eval-007",
+  "title": "NLP Pipeline Design Session",
+  "meeting_date": "2026-08-29T09:00:00Z",
+  "source_type": "audio/wav",
+  "participants": [
+    {"id": "p-nisha-m7", "canonical_name": "Nisha Patel"},
+    {"id": "p-priya-m7", "canonical_name": "Priya Sharma"},
+    {"id": "p-rahul-m7", "canonical_name": "Rahul Verma"}
+  ],
+  "speakers": [
+    {"speaker_id": "spk_nisha", "name": "Nisha Patel"},
+    {"speaker_id": "spk_priya", "name": "Priya Sharma"},
+    {"speaker_id": "spk_rahul", "name": "Rahul Verma"}
+  ],
+  "segments": [
+    {
+      "segment_id": "seg-m7-01", "sequence": 0, "speaker_id": "spk_nisha",
+      "start_time": 0.0, "end_time": 20.0,
+      "text": "Nisha Patel: We have decided to use spaCy as our NLP backbone for entity extraction. This replaces the earlier proposal to use NLTK."
+    },
+    {
+      "segment_id": "seg-m7-02", "sequence": 1, "speaker_id": "spk_priya",
+      "start_time": 20.5, "end_time": 40.0,
+      "text": "Priya Sharma: The database schema migration has been completed and deployed to staging. The task is marked as done as of today, August 29th."
+    },
+    {
+      "segment_id": "seg-m7-03", "sequence": 2, "speaker_id": "spk_rahul",
+      "start_time": 40.5, "end_time": 58.0,
+      "text": "Rahul Verma: We need an API rate limiter. We decided to implement Redis-based rate limiting using the token bucket algorithm. Rahul Verma owns this task, due by September 8th."
+    },
+    {
+      "segment_id": "seg-m7-04", "sequence": 3, "speaker_id": "spk_nisha",
+      "start_time": 58.5, "end_time": 75.0,
+      "text": "Nisha Patel: My NLP pipeline integration deadline has been extended from September 5th to September 10th because we added a co-reference resolution module to the scope."
+    }
+  ]
+}

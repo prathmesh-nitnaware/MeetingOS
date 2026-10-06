@@ -1,0 +1,38 @@
+{
+  "meeting_id": "meet-eval-006",
+  "title": "Infrastructure Architecture Review",
+  "meeting_date": "2026-08-27T11:00:00Z",
+  "source_type": "audio/wav",
+  "participants": [
+    {"id": "p-rahul-m6", "canonical_name": "Rahul Verma"},
+    {"id": "p-alex-m6", "canonical_name": "Alex Rivera"},
+    {"id": "p-kiran-m6", "canonical_name": "Kiran Das"}
+  ],
+  "speakers": [
+    {"speaker_id": "spk_rahul", "name": "Rahul Verma"},
+    {"speaker_id": "spk_alex", "name": "Alex Rivera"},
+    {"speaker_id": "spk_kiran", "name": "Kiran Das"}
+  ],
+  "segments": [
+    {
+      "segment_id": "seg-m6-01", "sequence": 0, "speaker_id": "spk_alex",
+      "start_time": 0.0, "end_time": 18.0,
+      "text": "Alex Rivera: We are reversing the Docker Compose decision. After benchmarking, the team has decided to migrate to Kubernetes for production orchestration. This supersedes the decision from last sprint."
+    },
+    {
+      "segment_id": "seg-m6-02", "sequence": 1, "speaker_id": "spk_kiran",
+      "start_time": 18.5, "end_time": 38.0,
+      "text": "Kiran Das: Kiran Das will own the Kubernetes cluster setup. The target completion date is September 15th. This is a hard deadline linked to the production launch."
+    },
+    {
+      "segment_id": "seg-m6-03", "sequence": 2, "speaker_id": "spk_rahul",
+      "start_time": 38.5, "end_time": 55.0,
+      "text": "Rahul Verma: The Redis timeout issue has recurred despite our connection pool fix. We are escalating this to a P1 incident. Alex Rivera is assigned to resolve it completely."
+    },
+    {
+      "segment_id": "seg-m6-04", "sequence": 3, "speaker_id": "spk_alex",
+      "start_time": 55.5, "end_time": 72.0,
+      "text": "Alex Rivera: I accept the Redis P1 assignment. I will implement a circuit breaker pattern and add retry logic. Deadline: September 3rd."
+    }
+  ]
+}

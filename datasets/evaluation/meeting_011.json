@@ -1,0 +1,38 @@
+{
+  "meeting_id": "meet-eval-011",
+  "title": "API Design and Versioning",
+  "meeting_date": "2026-09-12T09:30:00Z",
+  "source_type": "audio/wav",
+  "participants": [
+    {"id": "p-nisha-m11", "canonical_name": "Nisha Patel"},
+    {"id": "p-rahul-m11", "canonical_name": "Rahul Verma"},
+    {"id": "p-kiran-m11", "canonical_name": "Kiran Das"}
+  ],
+  "speakers": [
+    {"speaker_id": "spk_nisha", "name": "Nisha Patel"},
+    {"speaker_id": "spk_rahul", "name": "Rahul Verma"},
+    {"speaker_id": "spk_kiran", "name": "Kiran Das"}
+  ],
+  "segments": [
+    {
+      "segment_id": "seg-m11-01", "sequence": 0, "speaker_id": "spk_rahul",
+      "start_time": 0.0, "end_time": 20.0,
+      "text": "Rahul Verma: We decided to version the API under /api/v1 prefix. This is consistent with the REST versioning convention we agreed on in the kickoff."
+    },
+    {
+      "segment_id": "seg-m11-02", "sequence": 1, "speaker_id": "spk_nisha",
+      "start_time": 20.5, "end_time": 40.0,
+      "text": "Nisha Patel: The pgvector dimension mismatch issue that Alex Rivera reported has been identified. The fix is to enforce 1536 dimensions as the standard embedding size across the pipeline."
+    },
+    {
+      "segment_id": "seg-m11-03", "sequence": 2, "speaker_id": "spk_kiran",
+      "start_time": 40.5, "end_time": 60.0,
+      "text": "Kiran Das: I will write the API integration test suite covering all endpoints. The task is due by September 20th."
+    },
+    {
+      "segment_id": "seg-m11-04", "sequence": 3, "speaker_id": "spk_rahul",
+      "start_time": 60.5, "end_time": 80.0,
+      "text": "Rahul Verma: We have a recurring authentication token expiry issue. Users are being logged out every 10 minutes instead of every 24 hours. This was first reported by Alex Rivera and has occurred twice now."
+    }
+  ]
+}

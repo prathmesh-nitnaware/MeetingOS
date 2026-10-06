@@ -1,0 +1,38 @@
+{
+  "meeting_id": "meet-eval-012",
+  "title": "Cross-Team Integration Planning",
+  "meeting_date": "2026-09-15T11:00:00Z",
+  "source_type": "audio/wav",
+  "participants": [
+    {"id": "p-priya-m12", "canonical_name": "Priya Sharma"},
+    {"id": "p-alex-m12", "canonical_name": "Alex Rivera"},
+    {"id": "p-nisha-m12", "canonical_name": "Nisha Patel"}
+  ],
+  "speakers": [
+    {"speaker_id": "spk_priya", "name": "Priya Sharma"},
+    {"speaker_id": "spk_alex", "name": "Alex Rivera"},
+    {"speaker_id": "spk_nisha", "name": "Nisha Patel"}
+  ],
+  "segments": [
+    {
+      "segment_id": "seg-m12-01", "sequence": 0, "speaker_id": "spk_priya",
+      "start_time": 0.0, "end_time": 22.0,
+      "text": "Priya Sharma: The JWT authentication module is complete and merged. RBAC with admin, member, and viewer roles is fully implemented. The auth task is closed."
+    },
+    {
+      "segment_id": "seg-m12-02", "sequence": 1, "speaker_id": "spk_alex",
+      "start_time": 22.5, "end_time": 45.0,
+      "text": "Alex Rivera: The authentication token expiry issue has been fixed. The JWT expiry was misconfigured as seconds instead of milliseconds. The fix is deployed."
+    },
+    {
+      "segment_id": "seg-m12-03", "sequence": 2, "speaker_id": "spk_nisha",
+      "start_time": 45.5, "end_time": 65.0,
+      "text": "Nisha Patel: We decided to integrate the Google Meet connector as the first external meeting source. Nisha Patel will own the connector implementation. Target delivery: September 22nd."
+    },
+    {
+      "segment_id": "seg-m12-04", "sequence": 3, "speaker_id": "spk_priya",
+      "start_time": 65.5, "end_time": 85.0,
+      "text": "Priya Sharma: Rahul Verma and Priya Sharma are jointly responsible for the data retention policy. We decided on a 90-day retention window for meeting transcripts."
+    }
+  ]
+}

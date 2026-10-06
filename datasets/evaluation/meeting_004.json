@@ -1,0 +1,38 @@
+{
+  "meeting_id": "meet-eval-004",
+  "title": "Database Migration Planning",
+  "meeting_date": "2026-08-22T10:00:00Z",
+  "source_type": "audio/wav",
+  "participants": [
+    {"id": "p-rahul-m4", "canonical_name": "Rahul Verma"},
+    {"id": "p-priya-m4", "canonical_name": "Priya Sharma"},
+    {"id": "p-alex-m4", "canonical_name": "Alex Rivera"}
+  ],
+  "speakers": [
+    {"speaker_id": "spk_rahul", "name": "Rahul Verma"},
+    {"speaker_id": "spk_priya", "name": "Priya Sharma"},
+    {"speaker_id": "spk_alex", "name": "Alex Rivera"}
+  ],
+  "segments": [
+    {
+      "segment_id": "seg-m4-01", "sequence": 0, "speaker_id": "spk_rahul",
+      "start_time": 0.0, "end_time": 12.0,
+      "text": "Rahul Verma: We have decided to adopt PostgreSQL as our primary database. The decision is final and replaces the earlier MongoDB evaluation."
+    },
+    {
+      "segment_id": "seg-m4-02", "sequence": 1, "speaker_id": "spk_priya",
+      "start_time": 12.5, "end_time": 30.0,
+      "text": "Priya Sharma: I will own the database schema migration task. The deadline is set for next Friday, which is August 29th."
+    },
+    {
+      "segment_id": "seg-m4-03", "sequence": 2, "speaker_id": "spk_alex",
+      "start_time": 30.5, "end_time": 45.0,
+      "text": "Alex Rivera: The Redis timeout issue we saw last sprint is still unresolved. We need to fix the connection pool configuration."
+    },
+    {
+      "segment_id": "seg-m4-04", "sequence": 3, "speaker_id": "spk_rahul",
+      "start_time": 45.5, "end_time": 60.0,
+      "text": "Rahul Verma: Agreed. Rahul Verma will investigate the Redis timeout root cause and report by Tuesday."
+    }
+  ]
+}

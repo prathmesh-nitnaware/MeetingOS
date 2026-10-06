@@ -1,0 +1,60 @@
+{
+  "meeting_id": "meet-eval-002",
+  "title": "Database Decision Sync",
+  "meeting_date": "2026-08-22T10:00:00Z",
+  "source_type": "audio/wav",
+  "participants": [
+    {
+      "id": "p-rahul-m2",
+      "canonical_name": "Rahul Verma"
+    },
+    {
+      "id": "p-priya-m2",
+      "canonical_name": "Priya Sharma"
+    },
+    {
+      "id": "p-alex-m2",
+      "canonical_name": "Alex Rivera"
+    }
+  ],
+  "speakers": [
+    {
+      "speaker_id": "spk_rahul",
+      "name": "Rahul Verma"
+    },
+    {
+      "speaker_id": "spk_priya",
+      "name": "Priya Sharma"
+    },
+    {
+      "speaker_id": "spk_alex",
+      "name": "Alex Rivera"
+    }
+  ],
+  "segments": [
+    {
+      "segment_id": "seg-m2-01",
+      "sequence": 0,
+      "speaker_id": "spk_rahul",
+      "start_time": 0.0,
+      "end_time": 10.0,
+      "text": "Rahul Verma: Let's finalize the database. We decided to adopt PostgreSQL for MeetingOS since pgvector fits our needs better than MongoDB."
+    },
+    {
+      "segment_id": "seg-m2-02",
+      "sequence": 1,
+      "speaker_id": "spk_priya",
+      "start_time": 10.5,
+      "end_time": 20.0,
+      "text": "Priya Sharma: Understood. I will finish the database schema migration by Friday."
+    },
+    {
+      "segment_id": "seg-m2-03",
+      "sequence": 2,
+      "speaker_id": "spk_alex",
+      "start_time": 20.5,
+      "end_time": 30.0,
+      "text": "Alex Rivera: I am tracking the Redis timeout issue, but it is still ongoing."
+    }
+  ]
+}
